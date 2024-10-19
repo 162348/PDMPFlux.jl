@@ -9,8 +9,11 @@ This repository contains a [`Zygote.jl`](https://github.com/FluxML/Zygote.jl) im
 
 Currently, only Zig-Zag samplers are implemented.
 
-## Examples
+## Installation
 
+`julia >= 1.11` is required, due to `Random.jl` compatibility issues.
+
+## Examples
 
 ```julia
 using PDMPFlux
