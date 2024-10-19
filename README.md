@@ -7,7 +7,43 @@
 
 This repository contains a [`Zygote.jl`](https://github.com/FluxML/Zygote.jl) implementation of the PDMP samplers.
 
+Currently, only Zig-Zag samplers are implemented.
+
 ## Examples
+
+
+```julia
+using PDMPFlux
+
+N_sk = 1_000_000 # number of skeleton points
+N = 1_000_000 # number of samples
+
+function U_banana(x::Vector{Float64})
+    mean_x2 = (x[1]^2 - 1)
+    return -(- x[1]^2 + -(x[2] - mean_x2)^2 - sum(x[3:end].^2)) / 2
+end
+
+dim = 50
+xinit = ones(dim)
+vinit = ones(dim)
+grid_size = 0  # use constant bounds
+
+sampler = ZigZag(dim, grad_U, grid_size=grid_size)  # initialize your Zig-Zag sampler
+output = sample_skeleton(sampler, N_sk, xinit, vinit, verbose = true)  # simulate skeleton points
+samples = sample_from_skeleton(sampler, N, output)  # get samples from the skeleton points
+
+jointplot(samples, coordinate_numbers=[2,1])
+plot_traj(output, 10000)
+diagnostic(output)
+```
+
+## Gallery
+
+![](assets/banana_density.svg)
+
+![](assets/banana_jointplot.svg)
+
+![](assets/Cauchy1D.gif)
 
 ## Remarks
 
