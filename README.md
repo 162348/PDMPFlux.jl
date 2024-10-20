@@ -11,7 +11,7 @@ Currently, only Zig-Zag samplers are implemented.
 
 ## Installation
 
-`julia >= 1.11` is required, due to `Random.jl` compatibility issues.
+Currently, `julia >= 1.11` is required, due to `Random.jl` compatibility issues.
 
 ## Examples
 
