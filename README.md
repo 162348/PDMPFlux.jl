@@ -1,9 +1,8 @@
 # PDMPFlux
 
-[![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://162348.github.io/PDMPFlux.jl/stable/)
-[![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://162348.github.io/PDMPFlux.jl/dev/)
-[![Build Status](https://github.com/162348/PDMPFlux.jl/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/162348/PDMPFlux.jl/actions/workflows/CI.yml?query=branch%3Amain)
-[![Coverage](https://codecov.io/gh/162348/PDMPFlux.jl/branch/main/graph/badge.svg)](https://codecov.io/gh/162348/PDMPFlux.jl)
+| Documentation | Workflows | Code Coverage | Quality Assurance |
+|:-------------:|:---------:|:-------------:|:-----------------:|
+| [![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://162348.github.io/PDMPFlux.jl/stable/) | [![Build Status](https://github.com/162348/PDMPFlux.jl/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/162348/PDMPFlux.jl/actions/workflows/CI.yml?query=branch%3Amain) | [![Coverage](https://codecov.io/gh/162348/PDMPFlux.jl/branch/main/graph/badge.svg)](https://codecov.io/gh/162348/PDMPFlux.jl) | [![Aqua QA](https://raw.githubusercontent.com/JuliaTesting/Aqua.jl/master/badge.svg)](https://github.com/JuliaTesting/Aqua.jl) |
 
 This repository contains a [`Zygote.jl`](https://github.com/FluxML/Zygote.jl) implementation of the PDMP samplers.
 
@@ -12,6 +11,14 @@ Currently, only Zig-Zag samplers are implemented.
 ## Installation
 
 Currently, `julia >= 1.11` is required, due to `Random.jl` compatibility issues.
+
+To install `PDMPFlux`, open up a Julia-REPL, type `]` to get into Pkg-mode, and type:
+
+```julia-repl
+(@v1.11) pkg> add PDMPFlux
+```
+
+which will install the package and all dependencies to your local environment.
 
 ## Examples
 

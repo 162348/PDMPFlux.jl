@@ -10,7 +10,7 @@ include("Samplers/AbstractPDMP.jl")
 # include("Samplers/SpeedupZigZag.jl")
 include("Samplers/ZigZagSamplers.jl")
 
-export PDMP, ZigZag, ZigZagAD
+export ZigZag, ZigZagAD  # PDMP
 
 include("SamplingLoop.jl")
 include("sample.jl")
@@ -21,8 +21,5 @@ include("diagnostic.jl")
 include("plot.jl")
 
 export diagnostic, plot_traj, anim_traj, jointplot
-
-using StatsPlots
-export marginalhist
 
 end
