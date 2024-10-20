@@ -49,7 +49,7 @@ plot_funnel()
 
 function run_ZigZag_on_funnel(N_sk::Int=100_000, N::Int=100_000, d::Int=10)
     U, _ = funnel(d)
-    grad_U(x::Vector{Float64}) = gradient(U, x)[1]
+    grad_U(x::Vector{Float64}) = ForwardDiff.gradient(U, x)[1]
     xinit = ones(d)
     vinit = ones(d)
     seed = 2024

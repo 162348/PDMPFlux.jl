@@ -103,29 +103,30 @@ mutable struct ZigZag <: AbstractPDMP
     end
 end
 
-using Zygote
+using Zygote, ForwardDiff, ReverseDiff
 
 function ZigZagAD(dim::Int, U::Function; refresh_rate::Float64=0.0, grid_size::Int=10, tmax::Union{Float64, Int}=2.0, 
-                    vectorized_bound::Bool=true, signed_bound::Bool=true, adaptive::Bool=true)
+                    vectorized_bound::Bool=true, signed_bound::Bool=true, adaptive::Bool=true, AD_backend::String="Zygote")
 
     grad_U = nothing
+    AD_backend = eval(Symbol(AD_backend))
 
     ## If U is one dimensional and takes Float64 instead of Vector{Float64}, change grad_U accordingly:
     if dim == 1
         try
             U([1.0])
         catch
-            grad_U = function(x::Vector{Float64})
-                return gradient(U, x[1])[1]
+            grad_U = function(x::Vector)
+                return AD_backend.gradient(U, x[1])[1]
             end
         else
-            grad_U = function(x::Vector{Float64})
-                return gradient(U, x)[1]
+            grad_U = function(x::Vector)
+                return AD_backend.gradient(U, x)[1]
             end
         end
     else
-        grad_U = function(x::Vector{Float64})
-            return gradient(U, x)[1]
+        grad_U = function(x::Vector)
+            return AD_backend.gradient(U, x)[1]
         end
     end
 

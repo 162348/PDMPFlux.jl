@@ -37,28 +37,36 @@ end
 
 ## TODO: Implement upper_bound_grid and upper_bound_grid_vect functions
 
+using ForwardDiff
+
 """
-    upper_bound_grid(func, start, horizon, n_grid, refresh_rate)
+    upper_bound_grid(func, start=0.0, horizon, n_grid, refresh_rate)
     Compute the upper bound as a piecewise constant function using a grid mechanism.
 
     Args:
         func: the function for which the upper bound is computed
-        a (Float64): the lower bound of the interval
-        b (Float64): the upper bound of the interval
+        start (Float64): the lower bound of the interval
+        horizon (Float64): the upper bound of the interval
         n_grid (Int64, optional): size of the grid for the upperbound of func. Defaults to 100.
         refresh_rate (Float64, optional): refresh rate for the upper bound. Defaults to 0.
 
     Returns:
         BoundBox: An object containing the upper bound constant information.
 """
-function upper_bound_grid(func::Function, start::Float64, horizon::Float64, n_grid::Int=100, refresh_rate::Float64 = 0.0)
+function upper_bound_grid(func::Function, start::Float64, horizon::Float64, n_grid::Int=100, refresh_rate::Float64 = 0.0; AD_backend::String="ForwardDiff")::BoundBox
+    # grid の生成
     t = range(start, stop=horizon, length=n_grid)
-    step_size = t[2] - t[1]
+    step_size = t[2] - t[1]  # jax と最後の桁の数値が違う
     
-    values = [func(x) for x in t]
-    grads = [ForwardDiff.derivative(func, x) for x in t]
+    ## grid 上での値と微分係数の計算
+    values = map(func, t)  # その結果後ろの方では結構数値誤差が蓄積している可能性があるが，jax と Julia のどっちがより正しいかは不明．
+    if AD_backend == "ForwardDiff"
+        grads = [ForwardDiff.derivative(func, x) for x in t]
+    elseif AD_backend == "Zygote"
+        grads = [Zygote.gradient(func, x)[1][1] for x in t]
+    end
     
-    intersection_pos = (values[1:end-1] .- values[2:end] .+ grads[2:end] .* step_size) ./ (grads[2:end] .- grads[1:end-1])
+    intersection_pos = (values[1:end-1] .- values[2:end] .+ (grads[2:end] .* step_size)) ./ (grads[2:end] .- grads[1:end-1])
     intersection_pos = replace(intersection_pos, NaN => 0.0)
     intersection_pos = clamp.(intersection_pos, 0.0, step_size)
     
@@ -69,13 +77,54 @@ function upper_bound_grid(func::Function, start::Float64, horizon::Float64, n_gr
     box_max .+= refresh_rate
     
     cum_sum = zeros(Float64, n_grid)
-    cum_sum[2:end] .= cumsum(box_max) .* step_size
+    cum_sum[2:end] = cumsum(box_max) .* step_size
     
     return BoundBox(collect(t), box_max, cum_sum, step_size)
 end
 
-function upper_bound_grid_vect(func, start, horizon, grid_size::Union{Float64,Int} = 10)
-    throw(NotImplementedError("upper_bound_grid_vect is not implemented yet."))
+using LinearAlgebra
+
+"""
+    upper_bound_grid_vect(func, start, horizon, n_grid)
+    Compute the upper bound using a grid with the vectorized strategy
+
+    For this function, func(x) takes vector values with the dimension `dim`.
+
+    Args:
+        func: the function for which the upper bound is computed
+        a (Float64): the lower bound of the interval
+        b (Float64): the upper bound of the interval
+        n_grid (Int64, optional): size of the grid for the upperbound of func. Defaults to 100.
+
+    Returns:
+        BoundBox: An object containing the upper bound constant information.
+"""
+function upper_bound_grid_vect(func::Function, start::Float64, horizon::Float64, n_grid::Int=100; AD_backend::String="ForwardDiff")::BoundBox
+    t = range(start, stop=horizon, length=n_grid)
+    step_size = t[2] - t[1]
+    
+    # Vectorized function evaluation and gradient computation
+    values = hcat(map(func, t)...)
+    if AD_backend == "ForwardDiff"
+        grads = hcat([ForwardDiff.derivative(func, x) for x in t]...)
+    elseif AD_backend == "Zygote"
+        grads = hcat([Zygote.jacobian(func, x)[1] for x in t]...)
+    end
+    
+    intersection_pos = (values[:,1:end-1] .- values[:,2:end] .+ (grads[:,2:end] .* step_size)) ./ (grads[:,2:end] .- grads[:,1:end-1])
+    intersection_pos = replace(intersection_pos, NaN => 0.0)
+    intersection_pos = clamp.(intersection_pos, 0.0, step_size)
+    
+    intersection = values[:,1:end-1] .+ grads[:,1:end-1] .* intersection_pos
+
+    box_max = max.(values[:,1:end-1], values[:,2:end])
+    box_max = max.(box_max, intersection)
+    box_max = max.(box_max, 0.0)
+    
+    cum_sum = zeros(size(values))
+    cum_sum[:,2:end] = cumsum(box_max, dims=2) .* step_size
+    
+    return BoundBox(collect(t), vec(sum(box_max, dims=1)), vec(sum(cum_sum, dims=1)), step_size)
 end
 
 

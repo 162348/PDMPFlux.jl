@@ -89,18 +89,17 @@ function init_state(pdmp::AbstractPDMP, xinit::Array{Float64}, vinit::Array{Floa
     if pdmp.grid_size == 0
         upper_bound_func = function(x, v, horizon)
             func = t -> pdmp.rate(x, v, t)  # pdmp.signed_bound のフラッグに依らず，符号なしの pdmp.rate を用いる．
-            return upper_bound_constant(func, 0.0, horizon)  # 対応する関数に置き換え
+            return upper_bound_constant(func, 0.0, horizon)
         end
-    ## upper_bound_grid, upper_bound_grid_vect は未実装
     elseif !pdmp.vectorized_bound
         upper_bound_func = function(x, v, horizon)
             func = t -> rate(x, v, t)
-            return upper_bound_grid(func, 0.0, horizon, pdmp.grid_size, refresh_rate)  # 対応する関数に置き換え
+            return upper_bound_grid(func, 0.0, horizon, pdmp.grid_size, refresh_rate)
         end
     else
         upper_bound_func = function(x, v, horizon)
             func = t -> rate_vect(x, v, t)
-            return upper_bound_grid_vect(func, 0.0, horizon, pdmp.grid_size)  # 対応する関数に置き換え
+            return upper_bound_grid_vect(func, 0.0, horizon, pdmp.grid_size) 
         end
     end
 

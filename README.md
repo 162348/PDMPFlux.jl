@@ -22,6 +22,26 @@ which will install the package and all dependencies to your local environment.
 
 ## Examples
 
+The simplest example may be the following:
+
+```julia
+using PDMPFlux
+
+function U_Gauss(x::Vector)
+    return sum(x.^2) / 2
+end
+
+dim = 10
+sampler = ZigZagAD(dim, U_Gauss)
+
+N_sk, N, xinit, vinit = 1_000_000, 1_000_000, zeros(dim), ones(dim)
+samples = sample(sampler, N_sk, N, xinit, vinit, seed=2024)
+
+jointplot(samples)
+```
+
+To diagnose the sampler, you can manually break down the `sample()` function into two steps: `sample_skeleton()` and `sample_from_skeleton()`:
+
 ```julia
 using PDMPFlux
 
@@ -42,9 +62,10 @@ sampler = ZigZag(dim, grad_U, grid_size=grid_size)  # initialize your Zig-Zag sa
 output = sample_skeleton(sampler, N_sk, xinit, vinit, verbose = true)  # simulate skeleton points
 samples = sample_from_skeleton(sampler, N, output)  # get samples from the skeleton points
 
-jointplot(samples, coordinate_numbers=[2,1])
 plot_traj(output, 10000)
 diagnostic(output)
+
+jointplot(samples)
 ```
 
 ## Gallery
