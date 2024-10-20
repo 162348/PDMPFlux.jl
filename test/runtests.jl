@@ -39,19 +39,15 @@ function ground_truth()
     contourf(x_range, y_range, z, xlabel="x2", ylabel="x1", title="Banana Density Contour", color=:summer)
 end
 
-ground_truth()
+# ground_truth()
 out, samples = runtest(N_sk, N)
 jointplot(samples, coordinate_numbers=[2,1])
-
+anim_traj(out, 10000; filename="ZigZag_Banana2D.gif", dt=0.1)
+anim_traj(out, 10000; filename="ZigZag_Banana3D.gif", dt=0.1, plot_type="3D")
 plot_traj(out, 10000)
-diagnostic(out)
-jointplot(samples, coordinate_numbers=[2,3])
+# diagnostic(out)
+# jointplot(samples, coordinate_numbers=[2,3])
 
-# @testset "PDMPFlux.jl" begin
-#     @test sampler.dim == dim
-#     @test sampler.grad_U == grad_U
-#     @test sampler.grid_size == grid_size
-# end
 
 
 

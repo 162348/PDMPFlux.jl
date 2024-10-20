@@ -53,7 +53,7 @@ function anim_traj(history::PDMPHistory, T_max::Int; filename::Union{String, Not
             background=background,
             linewidth=linewidth
             )
-        args = dynamic_range ? args[3:end] : args
+        args = dynamic_range ? (; args..., xlims=nothing, ylims=nothing) : args
         traj = traj[1,:]  # Vector に変換しないと @animate に掛かる時間が 10 倍くらいになる
         times = collect(Float64, 1:length(traj))  # なぜか Float64 にしないと @animate 内の push! エラー oundsError: attempt to access 2-element Vector{Plots.Series} at index [3] が出る
         p = plot(times[1:1], traj[1:1]; args...)
@@ -81,7 +81,7 @@ function anim_traj(history::PDMPHistory, T_max::Int; filename::Union{String, Not
             background=background,
             linewidth=linewidth
             )
-        args = dynamic_range ? args[3:end] : args
+        args = dynamic_range ? (; args..., xlims=nothing, ylims=nothing) : args
         traj_x = traj[1,:]
         traj_y = traj[2,:]
         p = plot(traj_x[1:1], traj_y[1:1]; args...)
@@ -110,7 +110,7 @@ function anim_traj(history::PDMPHistory, T_max::Int; filename::Union{String, Not
             background=background,
             linewidth=linewidth
             )
-        args = dynamic_range ? args[3:end] : args
+        args = dynamic_range ? (; args..., xlims=nothing, ylims=nothing, zlims=nothing) : args
         traj_x = traj[1,:]
         traj_y = traj[2,:]
         traj_z = traj[3,:]
@@ -127,10 +127,9 @@ function anim_traj(history::PDMPHistory, T_max::Int; filename::Union{String, Not
         end
     end
 
-    if filename !== nothing
-        filename = endswith(filename, ".gif") ? filename : filename * ".gif"
-        gif(anim, filename, fps=fps)
-    end
+    filename = isnothing(filename) ? "PDMPFlux_Animation.gif" : filename
+    filename = endswith(filename, ".gif") ? filename : filename * ".gif"
+    gif(anim, filename, fps=fps)
 
     return anim
 end

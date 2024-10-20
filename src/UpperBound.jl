@@ -37,8 +37,41 @@ end
 
 ## TODO: Implement upper_bound_grid and upper_bound_grid_vect functions
 
-function upper_bound_grid(func, start, horizon, grid_size, refresh_rate::Union{Float64,Int} = 0.0)
-    throw(NotImplementedError("upper_bound_grid is not implemented yet."))
+"""
+    upper_bound_grid(func, start, horizon, n_grid, refresh_rate)
+    Compute the upper bound as a piecewise constant function using a grid mechanism.
+
+    Args:
+        func: the function for which the upper bound is computed
+        a (Float64): the lower bound of the interval
+        b (Float64): the upper bound of the interval
+        n_grid (Int64, optional): size of the grid for the upperbound of func. Defaults to 100.
+        refresh_rate (Float64, optional): refresh rate for the upper bound. Defaults to 0.
+
+    Returns:
+        BoundBox: An object containing the upper bound constant information.
+"""
+function upper_bound_grid(func::Function, start::Float64, horizon::Float64, n_grid::Int=100, refresh_rate::Float64 = 0.0)
+    t = range(start, stop=horizon, length=n_grid)
+    step_size = t[2] - t[1]
+    
+    values = [func(x) for x in t]
+    grads = [ForwardDiff.derivative(func, x) for x in t]
+    
+    intersection_pos = (values[1:end-1] .- values[2:end] .+ grads[2:end] .* step_size) ./ (grads[2:end] .- grads[1:end-1])
+    intersection_pos = replace(intersection_pos, NaN => 0.0)
+    intersection_pos = clamp.(intersection_pos, 0.0, step_size)
+    
+    intersection = values[1:end-1] .+ grads[1:end-1] .* intersection_pos
+    box_max = max.(values[1:end-1], values[2:end])
+    box_max = max.(box_max, intersection)
+    box_max = max.(box_max, 0.0)
+    box_max .+= refresh_rate
+    
+    cum_sum = zeros(Float64, n_grid)
+    cum_sum[2:end] .= cumsum(box_max) .* step_size
+    
+    return BoundBox(collect(t), box_max, cum_sum, step_size)
 end
 
 function upper_bound_grid_vect(func, start, horizon, grid_size::Union{Float64,Int} = 10)

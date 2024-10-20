@@ -1,6 +1,6 @@
 using PDMPFlux
 
-using Zygote, Random
+using Zygote, Random, Plots, LaTeXStrings
 
 function U_Gauss(x::Union{Float64, Int})
     x = Float64(x)
@@ -10,6 +10,17 @@ end
 function U_Cauchy(x::Union{Float64, Int})
     x = Float64(x)
     return log(1 + x^2)
+end
+
+function plot_densities()
+    # プロット範囲の設定
+    x_values = -10:0.1:10
+
+    # U_Gauss と U_Cauchy の値を計算
+    y_gauss = [exp(-U_Gauss(x)) for x in x_values]
+    y_cauchy = [exp(-U_Cauchy(x)) for x in x_values]
+    plot(x_values, y_gauss, label="Gaussian density", xlabel=L"x", ylabel=L"p(x)", title="Gaussian vs Cauchy", color="#78C2AD")
+    plot!(x_values, y_cauchy, label="Cauchy density", color="#E95420")
 end
 
 dim = 1
