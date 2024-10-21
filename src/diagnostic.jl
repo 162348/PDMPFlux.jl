@@ -36,19 +36,19 @@ end
 
 using ProgressBars
 
-function anim_traj(history::PDMPHistory, T_max::Int; filename::Union{String, Nothing}=nothing, plot_type="2D", color="#78C2AD", background="#FFF", coordinate_numbers=[1,2,3], dt::Float64=0.1, verbose::Bool=true, fps::Int=60, frame_upper_limit::Int=10000, linewidth=2, dynamic_range::Bool=false)
+function anim_traj(history::PDMPHistory, T_max::Int; T_start::Int=1, plot_start::Int=1, filename::Union{String, Nothing}=nothing, plot_type="2D", color="#78C2AD", background="#FFF", coordinate_numbers=[1,2,3], dt::Float64=0.1, verbose::Bool=true, fps::Int=60, frame_upper_limit::Int=10000, linewidth=2, dynamic_range::Bool=false)
     T_max = min(T_max, length(history.t))  # avoids BoundsError
     trajectory = hcat(history.x...)
 
     if trajectory.size[1] == 1
-        traj, event_time = traj_for_animation(trajectory, T_max; coordinate_numbers=coordinate_numbers[1], dt=dt)
+        traj, event_time = traj_for_animation(trajectory, T_start, T_max; coordinate_numbers=coordinate_numbers[1], dt=dt)
         args = (
             xlims=(0, min(traj.size[2], frame_upper_limit)),
-            ylims=(floor(minimum(traj[1,:]),digits=1), ceil(maximum(traj[1,:]),digits=1)),
+            ylims=(floor(minimum(traj[1,plot_start:end]),digits=1), ceil(maximum(traj[1,plot_start:end]),digits=1)),
             xlabel=L"t",
             ylabel=L"x",
             label=false,
-            title="Trajectory (up to $T_max events)",
+            title="Trajectory (from $T_start to $T_max events)",
             color=color,
             background=background,
             linewidth=linewidth
@@ -56,10 +56,15 @@ function anim_traj(history::PDMPHistory, T_max::Int; filename::Union{String, Not
         args = dynamic_range ? (; args..., xlims=nothing, ylims=nothing) : args
         traj = traj[1,:]  # Vector に変換しないと @animate に掛かる時間が 10 倍くらいになる
         times = collect(Float64, 1:length(traj))  # なぜか Float64 にしないと @animate 内の push! エラー oundsError: attempt to access 2-element Vector{Plots.Series} at index [3] が出る
-        p = plot(times[1:1], traj[1:1]; args...)
 
         upper_limit = min(length(traj), frame_upper_limit)
-        iter = verbose ? ProgressBar(1:upper_limit, unit="B", unit_scale=true) : 1:upper_limit
+        if plot_start > upper_limit
+            @warn "plot_start: $plot_start, upper_limit: $upper_limit"
+            plot_start = upper_limit - 100
+        end
+        iter = verbose ? ProgressBar(plot_start:upper_limit, unit="B", unit_scale=true) : plot_start:upper_limit
+        p = plot(times[1:plot_start], traj[1:plot_start]; args...)
+        scatter!(p, [times[intersect(1:plot_start, event_time)]], traj[intersect(1:plot_start, event_time)], marker=:circle, markersize=3, markeralpha=0.6, color="#E95420", label=false)
 
         anim = @animate for i ∈ iter
             Base.push!(p, times[i], traj[i])
@@ -69,14 +74,14 @@ function anim_traj(history::PDMPHistory, T_max::Int; filename::Union{String, Not
         end
 
     elseif plot_type == "2D"
-        traj, event_time = traj_for_animation(trajectory, T_max; coordinate_numbers=coordinate_numbers[1:2], dt=dt)
+        traj, event_time = traj_for_animation(trajectory, T_start, T_max; coordinate_numbers=coordinate_numbers[1:2], dt=dt)
         args = (
-            xlims=(floor(minimum(traj[1,:]),digits=1), ceil(maximum(traj[1,:]),digits=1)),
-            ylims=(floor(minimum(traj[2,:]),digits=1), ceil(maximum(traj[2,:]),digits=1)),
+            xlims=(floor(minimum(traj[1,plot_start:end]),digits=1), ceil(maximum(traj[1,plot_start:end]),digits=1)),
+            ylims=(floor(minimum(traj[2,plot_start:end]),digits=1), ceil(maximum(traj[2,plot_start:end]),digits=1)),
             xlabel=L"x_1",
             ylabel=L"x_2",
             label=false,
-            title="Trajectory (up to $T_max events)",
+            title="Trajectory (from $T_start to $T_max events)",
             color=color,
             background=background,
             linewidth=linewidth
@@ -84,10 +89,15 @@ function anim_traj(history::PDMPHistory, T_max::Int; filename::Union{String, Not
         args = dynamic_range ? (; args..., xlims=nothing, ylims=nothing) : args
         traj_x = traj[1,:]
         traj_y = traj[2,:]
-        p = plot(traj_x[1:1], traj_y[1:1]; args...)
 
         upper_limit = min(length(traj_x), frame_upper_limit)
-        iter = verbose ? ProgressBar(1:upper_limit, unit="B", unit_scale=true) : 1:upper_limit
+        if plot_start > upper_limit
+            @warn "plot_start: $plot_start, upper_limit: $upper_limit"
+            plot_start = upper_limit - 100
+        end
+        iter = verbose ? ProgressBar(plot_start:upper_limit, unit="B", unit_scale=true) : plot_start:upper_limit
+        p = plot(traj_x[1:plot_start], traj_y[1:plot_start]; args...)
+        scatter!(p, [traj_x[intersect(1:plot_start, event_time)]], traj_y[intersect(1:plot_start, event_time)], marker=:circle, markersize=3, markeralpha=0.6, color="#E95420", label=false)
 
         anim = @animate for i ∈ iter
             Base.push!(p, traj_x[i], traj_y[i])
@@ -96,11 +106,11 @@ function anim_traj(history::PDMPHistory, T_max::Int; filename::Union{String, Not
             end
         end
     else
-        traj, event_time = traj_for_animation(trajectory, T_max; coordinate_numbers=coordinate_numbers[1:3], dt=dt)
+        traj, event_time = traj_for_animation(trajectory, T_start, T_max; coordinate_numbers=coordinate_numbers[1:3], dt=dt)
         args = (
-            xlims=(floor(minimum(traj[1,:]),digits=1), ceil(maximum(traj[1,:]),digits=1)),
-            ylims=(floor(minimum(traj[2,:]),digits=1), ceil(maximum(traj[2,:]),digits=1)),
-            zlims=(floor(minimum(traj[3,:]),digits=1), ceil(maximum(traj[3,:]),digits=1)),
+            xlims=(floor(minimum(traj[1,plot_start:end]),digits=1), ceil(maximum(traj[1,plot_start:end]),digits=1)),
+            ylims=(floor(minimum(traj[2,plot_start:end]),digits=1), ceil(maximum(traj[2,plot_start:end]),digits=1)),
+            zlims=(floor(minimum(traj[3,plot_start:end]),digits=1), ceil(maximum(traj[3,plot_start:end]),digits=1)),
             xlabel=L"x_1",
             ylabel=L"x_2",
             zlabel=L"x_3",
@@ -114,11 +124,15 @@ function anim_traj(history::PDMPHistory, T_max::Int; filename::Union{String, Not
         traj_x = traj[1,:]
         traj_y = traj[2,:]
         traj_z = traj[3,:]
-        p = plot(traj_x[1:1], traj_y[1:1], traj_z[1:1]; args...)
 
         upper_limit = min(length(traj_x), frame_upper_limit)
-        iter = verbose ? ProgressBar(1:upper_limit, unit="B", unit_scale=true) : 1:upper_limit
-
+        if plot_start > upper_limit
+            @warn "plot_start: $plot_start, upper_limit: $upper_limit"
+            plot_start = upper_limit - 100
+        end
+        iter = verbose ? ProgressBar(plot_start:upper_limit, unit="B", unit_scale=true) : plot_start:upper_limit
+        p = plot(traj_x[1:plot_start], traj_y[1:plot_start], traj_z[1:plot_start]; args...)
+        scatter!(p, [traj_x[intersect(1:plot_start, event_time)]], traj_y[intersect(1:plot_start, event_time)], traj_z[intersect(1:plot_start, event_time)], marker=:circle, markersize=3, markeralpha=0.6, color="#E95420", label=false)
         anim = @animate for i ∈ iter
             Base.push!(p, traj_x[i], traj_y[i], traj_z[i])
             if i ∈ event_time
@@ -134,16 +148,16 @@ function anim_traj(history::PDMPHistory, T_max::Int; filename::Union{String, Not
     return anim
 end
 
-function traj_for_animation(trajectory::Matrix{Float64}, T_max::Int; coordinate_numbers=[1,2,3], dt::Float64=0.01)
-    traj = trajectory[coordinate_numbers, 1:T_max]
+function traj_for_animation(trajectory::Matrix{Float64}, T_start::Int, T_max::Int; coordinate_numbers=[1,2,3], dt::Float64=0.01)
+    traj = trajectory[coordinate_numbers, T_start:T_max]
     traj = isa(traj, Vector) ? reshape(traj, 1, :) : traj
     x = []
     event_time = []
-    for (point, n) in zip(eachcol(traj),1:T_max)
+    for (point, n) in zip(eachcol(traj),1:T_max-T_start+1)
         if n == 1  # initialize
             Base.push!(x, point)
             Base.push!(event_time, length(x))
-        elseif n != T_max
+        elseif n != T_max - T_start + 1
             displacement = traj[:,n+1] .- point
             distance = sqrt(sum(displacement.^2))
             step_number = round(Int, distance/dt)

@@ -31,7 +31,7 @@ end
         horizon (Float64): horizon
         key (Any): random key
         integrator (Function): integrator function
-        grad_U (Function): gradient of the potential function
+        ∇U (Function): gradient of the potential function
         rate (Function): rate function
         velocity_jump (Function): velocity jump function
         upper_bound_func (Function): upper bound function
@@ -56,7 +56,7 @@ mutable struct PDMPState <: Any
     horizon::Float64
     key::AbstractRNG
     integrator::Function
-    grad_U::Function
+    ∇U::Function
     rate::Function
     velocity_jump::Function
     upper_bound_func::Function
@@ -76,7 +76,7 @@ mutable struct PDMPState <: Any
     adaptive::Bool
 end
 
-function PDMPState(x::Vector{Float64}, v::Vector{Float64}, t::Float64, horizon::Float64, key::AbstractRNG, integrator::Function, grad_U::Function, rate::Function, velocity_jump::Function, upper_bound_func::Function, upper_bound::Union{Nothing, BoundBox}, adaptive::Bool)
+function PDMPState(x::Vector{Float64}, v::Vector{Float64}, t::Float64, horizon::Float64, key::AbstractRNG, integrator::Function, ∇U::Function, rate::Function, velocity_jump::Function, upper_bound_func::Function, upper_bound::Union{Nothing, BoundBox}, adaptive::Bool)
     accept = false
     indicator = false
     tp = 0.0
@@ -89,7 +89,7 @@ function PDMPState(x::Vector{Float64}, v::Vector{Float64}, t::Float64, horizon::
     error_value_ar = zeros(5)
     rejected = 0
     hitting_horizon = 0
-    return PDMPState(x, v, t, horizon, key, integrator, grad_U, rate, velocity_jump, upper_bound_func, accept, upper_bound, indicator, tp, ts, exp_rv, lambda_bar, lambda_t, ar, error_bound, error_value_ar, rejected, hitting_horizon, adaptive)
+    return PDMPState(x, v, t, horizon, key, integrator, ∇U, rate, velocity_jump, upper_bound_func, accept, upper_bound, indicator, tp, ts, exp_rv, lambda_bar, lambda_t, ar, error_bound, error_value_ar, rejected, hitting_horizon, adaptive)
 end
 
 

@@ -7,6 +7,9 @@ using Distributions
 
 """
     one_step(state::PDMPState)::PDMPState
+
+    state.indicator が false である限り，one_step_while() を繰り返す．
+    state.indicator が true になるには ok_acceptance() → if_accept() が呼ばれる必要がある．
 """
 function one_step(state::PDMPState)::PDMPState
 
@@ -26,22 +29,22 @@ end
 
 """
     state.indicator が false である限り実行する処理
-    move_before_horizon() で ok_acceptance() が呼ばれるまで繰り返す．
+    move_before_horizon() → ok_acceptance() → if_accept() が呼ばれるまで繰り返す．
 """
 function one_step_while(state::PDMPState)::PDMPState
-    upper_bound = state.upper_bound_func(state.x, state.v, state.horizon)
+    upper_bound::BoundBox = state.upper_bound_func(state.x, state.v, state.horizon)
     
     exp_rv = rand(state.key, Exponential(1.0))
     
-    tp, lambda_bar = next_event(upper_bound, exp_rv)
-    cond = tp > state.horizon
+    tp, lambda_bar = next_event(upper_bound, exp_rv)  # tp: proposed time and lambda_bar: upper bound value just before tp.
+    # lambda_bar can be insufficient as an upper bound. In that case, error_acceptance() is called in inner_while().
     
     state.tp = tp
     state.exp_rv = exp_rv
     state.lambda_bar = lambda_bar
     state.upper_bound = upper_bound
 
-    if cond
+    if tp > state.horizon
         state = move_to_horizon(state)
     else
         state = move_before_horizon(state)
@@ -51,17 +54,13 @@ function one_step_while(state::PDMPState)::PDMPState
 end
 
 """
-    horizon より先に event が起こった場合の処理
-    inner_while() の繰り返しとして実装される．
+    tp <= state.horizon の場合の処理
+    state.accept = true になるまでの inner_while() の繰り返しとして実装される．
 """
 function move_before_horizon(state::PDMPState)::PDMPState
     state.accept = false
 
-    function cond(state)
-        return state.tp < state.horizon && !state.accept
-    end
-
-    while cond(state)
+    while state.tp < state.horizon && !state.accept
         state = inner_while(state)
     end
 
@@ -85,7 +84,8 @@ function inner_while(state::PDMPState)::PDMPState
 end
 
 """
-    代理上界 lambda_bar で足りなかった場合は，ここで horizon を縮めて再度 Poisson 剪定を行う．
+    代理上界 lambda_bar で足りなかった場合は horizon を縮めてより慎重に inner_while() を繰り返す．
+    state.adaptive = true の場合は，ここで horizon を恒久的に縮めておく．
 """
 function error_acceptance(state::PDMPState)::PDMPState
     horizon = state.horizon / 2
@@ -93,10 +93,8 @@ function error_acceptance(state::PDMPState)::PDMPState
     exp_rv = rand(state.key, Exponential(1.0))
     tp, lambda_bar = next_event(upper_bound, exp_rv)
 
-    # adaptive = true の場合は horizon を縮める
-    horizon_new = state.adaptive ? horizon : state.horizon
-
-    state.horizon = horizon_new
+    # adaptive = true の場合は state.horizon を恒久的に縮める
+    state.horizon = state.adaptive ? horizon : state.horizon
     state.tp = tp
     state.exp_rv = exp_rv
     state.lambda_bar = lambda_bar
@@ -114,10 +112,9 @@ function ok_acceptance(state::PDMPState)::PDMPState
     accept = rand(Bernoulli(state.ar))
     state.accept = accept
     
-    state = accept ? if_accept(state) : if_not_accept(state)
-    
-    cond = (state.tp > state.horizon) && (!state.accept)
-    if cond
+    state = accept ? if_accept(state) : if_reject(state)
+
+    if (state.tp > state.horizon) && (!state.accept)
         state = move_to_horizon2(state)
     end
     
@@ -132,18 +129,14 @@ function if_accept(state::PDMPState)::PDMPState
     x, v = state.integrator(state.x, state.v, state.tp)
     v = state.velocity_jump(x, v, state.key)
     t = state.t + state.tp + state.ts
-    indicator = true
-    ts = 0.0
-    tp = 0.0
-    accept = true
 
     state.x = x
     state.v = v
     state.t = t
-    state.indicator = indicator
-    state.ts = ts
-    state.tp = tp
-    state.accept = accept
+    state.indicator = true
+    state.ts = 0.0
+    state.tp = 0.0
+    state.accept = true
     
     return state
 end
@@ -152,7 +145,7 @@ end
     代理上界 lambda_bar を用いた剪定で accept されなかった場合の処置
     horizon を超えるまで Poisson 剪定を繰り返す．
 """
-function if_not_accept(state::PDMPState)::PDMPState
+function if_reject(state::PDMPState)::PDMPState
     exp_rv = state.exp_rv + rand(state.key, Exponential(1.0))
     tp, lambda_bar = next_event(state.upper_bound, exp_rv)
 
@@ -169,7 +162,7 @@ function if_not_accept(state::PDMPState)::PDMPState
 end
 
 """
-    event が horizon の先に起こった場合，もう一度 Poisson simulation を行う．
+    tp > state.horizon の場合，もう一度 Poisson simulation を行う．
 """
 function move_to_horizon(state::PDMPState)::PDMPState
     ts = state.ts + state.horizon

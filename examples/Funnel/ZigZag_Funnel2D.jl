@@ -1,6 +1,6 @@
 using PDMPFlux
 
-using Random, Distributions, Plots, LaTeXStrings, LinearAlgebra, ForwardDiff
+using Random, Distributions, Plots, LaTeXStrings, ForwardDiff, LinearAlgebra
 
 """
     Funnel distribution for testing. Returns energy and sample functions.
@@ -59,13 +59,13 @@ function run_ZigZag_on_funnel(N_sk::Int=100_000, N::Int=100_000; d::Int=10)
     samples = sample_from_skeleton(sampler, N, out)
     return out, samples
 end
-output, samples = run_ZigZag_on_funnel(d=3)
+output, samples = run_ZigZag_on_funnel(d=2)
 
 # jointplot(samples)
 # plot_traj(output, 10000)
 # plot_traj(output, 1000, plot_type="3D")
 
-anim_traj(output, 1000, plot_type="3D"; plot_start=100, filename="ZigZag_Funnel3D.gif")
+anim_traj(output, 1000; plot_start=100, filename="ZigZag_Funnel2D.gif")
 # anim_traj(output, 1000; filename="ZigZag_Funnel2D.gif")
 
 diagnostic(output)

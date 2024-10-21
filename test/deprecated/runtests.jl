@@ -3,8 +3,8 @@ using PDMPFlux
 # using Test
 using Zygote, Random, Plots
 
-N_sk = 1_000_000 # number of skeleton points
-N = 1_000_000 # number of samples
+N_sk = 100_000 # number of skeleton points
+N = 100_000 # number of samples
 
 function runtest(N_sk::Int, N::Int)
     function U_banana(x::Vector)
@@ -38,13 +38,13 @@ function ground_truth()
     contourf(x_range, y_range, z, xlabel="x2", ylabel="x1", title="Banana Density Contour", color=:summer)
 end
 
-ground_truth()
+# ground_truth()
 out, samples = runtest(N_sk, N)
-jointplot(samples, coordinate_numbers=[2,1])
-# anim_traj(out, 10000; filename="ZigZag_Banana2D.gif", dt=0.1)
+# jointplot(samples, coordinate_numbers=[2,1])
+anim_traj(out, 100; filename="ZigZag_Banana2D_10.gif")
 # anim_traj(out, 10000; filename="ZigZag_Banana3D.gif", dt=0.1, plot_type="3D")
 # plot_traj(out, 10000)
-# diagnostic(out)
+diagnostic(out)
 # jointplot(samples, coordinate_numbers=[2,3])
 
 

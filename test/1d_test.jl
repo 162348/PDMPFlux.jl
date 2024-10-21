@@ -38,7 +38,8 @@ sampler_ad = ZigZagAD(dim, U_Cauchy, grid_size=grid_size)
 # samples_ad = sample(sampler_ad, N_sk, N, xinit, vinit, seed=seed, verbose = true)
 out_ad = sample_skeleton(sampler_ad, N_sk, xinit, vinit, seed=seed, verbose = true)
 plot_traj(out_ad, 300)
-# anim_traj(out_ad, 300, filename="Cauchy1D.gif", fps=60)
+anim_traj(out_ad, 50, filename="Cauchy1D.gif", fps=60, plot_start=100)
+diagnostic(out_ad)
 
 """
 * ∇U も Vector 値に対して定義される必要がある．

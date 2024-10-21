@@ -1,7 +1,7 @@
 name = "PDMPFlux"
 uuid = "fa921718-cbf9-4165-aaee-7047d51b02b3"
 authors = ["Hirofumi Shiba"]
-version = "0.2.0"
+version = "0.2.1"
 
 [deps]
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
