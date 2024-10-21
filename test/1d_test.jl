@@ -41,7 +41,7 @@ plot_traj(out_ad, 300)
 # anim_traj(out_ad, 300, filename="Cauchy1D.gif", fps=60)
 
 """
-* grad_U も Vector 値に対して定義される必要がある．
+* ∇U も Vector 値に対して定義される必要がある．
 * これを内部化してしまうという手もある．
 """
 
@@ -54,9 +54,9 @@ plot_traj(out_ad, 300)
 #     println(e)
 # end
 
-# grad_U(x::Union{Float64, Int}) = gradient(U_Gauss, x)[1]
-# grad_U(x::Vector{Float64}) = gradient(U_Gauss,x[1])[1]
+# ∇U(x::Union{Float64, Int}) = gradient(U_Gauss, x)[1]
+# ∇U(x::Vector{Float64}) = gradient(U_Gauss,x[1])[1]
 
-# sampler = ZigZag(dim, grad_U, grid_size=grid_size)
+# sampler = ZigZag(dim, ∇U, grid_size=grid_size)
 # out = sample_skeleton(sampler, N_sk, xinit, vinit, seed=seed, verbose = true)
 # samples = sample_from_skeleton(sampler, N, out)

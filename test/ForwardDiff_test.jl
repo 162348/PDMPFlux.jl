@@ -25,12 +25,12 @@ function V(x::Vector)
 end
 
 function run_ZigZag_on_funnel(N_sk::Int=100_000, N::Int=100_000, d::Int=10)
-    grad_U(x::Vector{Float64}) = ForwardDiff.gradient(V, x)
+    ∇U(x::Vector{Float64}) = ForwardDiff.gradient(V, x)
     xinit = ones(d)
     vinit = ones(d)
     seed = 2024
     grid_size = 0  # constant bounds
-    sampler = ZigZag(d, grad_U, grid_size=grid_size)
+    sampler = ZigZag(d, ∇U, grid_size=grid_size)
     out = sample_skeleton(sampler, N_sk, xinit, vinit, seed=seed, verbose = true)
     samples = sample_from_skeleton(sampler, N, out)
     return out, samples

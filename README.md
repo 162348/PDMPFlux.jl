@@ -10,7 +10,7 @@ Currently, only Zig-Zag samplers are implemented.
 
 ## Installation
 
-Currently, `julia >= 1.11` is required, due to `Random.jl` compatibility issues.
+Currently, `julia >= 1.11` is required, due to some compatibility issues.
 
 To install `PDMPFlux`, open up a Julia-REPL, type `]` to get into Pkg-mode, and type:
 
@@ -58,7 +58,7 @@ xinit = ones(dim)
 vinit = ones(dim)
 grid_size = 0  # use constant bounds
 
-sampler = ZigZag(dim, grad_U, grid_size=grid_size)  # initialize your Zig-Zag sampler
+sampler = ZigZag(dim, ∇U, grid_size=grid_size)  # initialize your Zig-Zag sampler
 output = sample_skeleton(sampler, N_sk, xinit, vinit, verbose = true)  # simulate skeleton points
 samples = sample_from_skeleton(sampler, N, output)  # get samples from the skeleton points
 
@@ -102,24 +102,33 @@ jointplot(samples)
 <table>
     <tbody>
         <tr>
-            <td style="width: 50%;"><img src="assets/Cauchy1D.gif"></td>
-            <td style="width: 50%;"><img src="assets/Gauss1D.gif"></td>
+            <td style="width: 33%;"><img src="assets/Cauchy1D.gif"></td>
+            <td style="width: 33%;"><img src="assets/Gauss1D.gif"></td>
+            <td style="width: 33%;"><img src="assets/densities.svg"></td>
         </tr>
         <tr>
             <td align="center"><a href="test/1d_test.jl"><sup>1D</sup> Zig-Zag on Cauchy</a></td>
             <td align="center"><a href="test/1d_test.jl"><sup>1D</sup> Zig-Zag on Gaussian</a></td>
+            <td align="center"><a href="test/1d_test.jl">Cauchy vs. Gaussian Density Plot</a></td>
         </tr>
     </tbody>
 </table>
 
 ## Remarks
 
-- The implementation of the PDMP samplers is based on the paper [Andral and Kamatani (2024) Automated Techniques for Efficient Sampling of Piecewise-Deterministic Markov Processes](https://arxiv.org/abs/2408.03682) and its implementation in [`pdmp_jax`](https://github.com/charlyandral/pdmp_jax).
-- `pdmp_jax` has a `jax` based implementation, and typically about four times faster than current `PDMPFlux.jl`.
+- The implementation of `PDMPFlux.jl` is based on the paper [Andral and Kamatani (2024) Automated Techniques for Efficient Sampling of Piecewise-Deterministic Markov Processes](https://arxiv.org/abs/2408.03682) and its accompanying Python package [`pdmp_jax`](https://github.com/charlyandral/pdmp_jax).
+- [`pdmp_jax`](https://github.com/charlyandral/pdmp_jax) has a [`jax`](https://github.com/jax-ml/jax) based implementation, and typically about four times faster than current `PDMPFlux.jl`.
+- Automatic differentiation engines I've tried are [`ForwardDiff.jl`](https://github.com/JuliaDiff/ForwardDiff.jl) and [`Zygote.jl`](https://github.com/FluxML/Zygote.jl). Both have pros and cons. I am still learning the trade-offs.
 
 ## References
 
-* [`pdmp_jax.jl`](https://github.com/charlyandral/pdmp_jax) by [Charly Andral](https://github.com/charlyandral): This repository is based on this repository.
+* [`pdmp_jax`](https://github.com/charlyandral/pdmp_jax) by [Charly Andral](https://github.com/charlyandral), on which this repository is strongly based on.
   * [Andral and Kamatani (2024) Automated Techniques for Efficient Sampling of Piecewise-Deterministic Markov Processes](https://arxiv.org/abs/2408.03682)
-* [`ForwardDiff.jl`](https://github.com/JuliaDiff/ForwardDiff.jl) is used for automatic differentiation.
-  * [Revels, Lubin, and Papamarkou (2016) Forward-Mode Automatic Differentiation in Julia](https://arxiv.org/abs/1607.07892)
+* [`ForwardDiff.jl`](https://github.com/JuliaDiff/ForwardDiff.jl) and [`Zygote.jl`](https://github.com/FluxML/Zygote.jl) are used for automatic differentiation.
+  * [Revels, Lubin, and Papamarkou (2016) Forward-Mode Automatic Differentiation rin Julia](https://arxiv.org/abs/1607.07892)
+  * [Innes et. al. (2018) Fashionable Modelling with Flux](https://arxiv.org/abs/1811.01457)
+* Other PDMP packages:
+  * Julia
+    * [`ZigZagBoomerang.jl`](https://github.com/mschauer/ZigZagBoomerang.jl) by [Marcel Schauer](https://github.com/mschauer)
+  * R
+    * [`rjpdmp`](https://github.com/matt-sutton/rjpdmp) by [Matthew Sutton](https://github.com/matt-sutton)

@@ -7,7 +7,7 @@ end
 dim = 10
 sampler = ZigZagAD(dim, U_Gauss, grid_size=10)
 
-N_sk, N, xinit, vinit = 1_000_000, 1_000_000, zeros(dim), ones(dim)
+N_sk, N, xinit, vinit = 100_000, 100_000, zeros(dim), ones(dim)
 # samples = sample(sampler, N_sk, N, xinit, vinit, seed=2024)
 
 output = sample_skeleton(sampler, N_sk, xinit, vinit, seed=2024)
@@ -19,7 +19,7 @@ jointplot(samples)
 # ForwardDiff: なぜかサンプルの精度が酷い
 ## grid 10 + vectorized 1:23 / 1.18, Mean 0.94
 ## grid 10 + non-vectorized 1:35, Mean 0.94
-## Brent 5:06, Mean ?
+## Brent 5:06, Mean ? → サンプルを 1/10 にして 0:12, Mean 0.87
 ## grid 100 + vectorized 6:35, Mean 0.94
 
 # Zygote

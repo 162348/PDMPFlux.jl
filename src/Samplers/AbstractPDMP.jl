@@ -11,7 +11,7 @@ abstract type AbstractPDMP end
     属性:
         dim::Int: 空間の次元。
         refresh_rate::Float64: リフレッシュレート。
-        grad_U::Function: ポテンシャルの勾配。
+        ∇U::Function: ポテンシャルの勾配。
         grid_size::Int: 空間を離散化するためのグリッドポイントの数。
         tmax::Float64: グリッドの最大時間。
         adaptive::Bool: 適応的なtmaxを使用するかどうか。
@@ -34,7 +34,7 @@ abstract type AbstractPDMP end
 # struct PDMP <: AbstractPDMP
 #     dim::Int
 #     refresh_rate::Float64
-#     grad_U::Function
+#     ∇U::Function
 #     grid_size::Int
 #     tmax::Float64
 
@@ -111,7 +111,7 @@ function init_state(pdmp::AbstractPDMP, xinit::Array{Float64}, vinit::Array{Floa
         pdmp.tmax,
         key,
         pdmp.integrator,
-        pdmp.grad_U,
+        pdmp.∇U,
         pdmp.rate,
         pdmp.velocity_jump,
         upper_bound_func,

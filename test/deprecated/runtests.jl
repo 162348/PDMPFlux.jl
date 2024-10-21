@@ -13,14 +13,14 @@ function runtest(N_sk::Int, N::Int)
     end
 
     dim = 50
-    grad_U(x::Vector) = gradient(U_banana, x)[1]
+    ∇U(x::Vector) = gradient(U_banana, x)[1]
     seed = 8
     key = MersenneTwister(seed)
     xinit = ones(dim)
     vinit = ones(dim)
     grid_size = 0  # constant bounds
 
-    sampler = ZigZag(dim, grad_U, grid_size=grid_size)
+    sampler = ZigZag(dim, ∇U, grid_size=grid_size)
     out = sample_skeleton(sampler, N_sk, xinit, vinit, seed=seed, verbose = true)
     samples = sample_from_skeleton(sampler, N, out)
 
