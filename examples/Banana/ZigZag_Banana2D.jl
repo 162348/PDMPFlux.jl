@@ -27,4 +27,4 @@ function runtest(N_sk::Int, N::Int, dim::Int=2)
 end
 
 out, samples = runtest(N_sk, N)
-anim_traj(out, 1000; T_start=100, plot_start=100, filename="ZigZag_Banana2D.gif")
+anim_traj(out, 1000; N_start=100, plot_start=100, filename="ZigZag_Banana2D.gif")

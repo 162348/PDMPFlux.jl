@@ -1,0 +1,1007 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.6.39">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="Hirofumi Shiba">
+<meta name="dcterms.date" content="2024-12-31">
+
+<title>Implementation Details of PDMPFlux.jl</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { display: inline-block; text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="Details_files/libs/clipboard/clipboard.min.js"></script>
+<script src="Details_files/libs/quarto-html/quarto.js"></script>
+<script src="Details_files/libs/quarto-html/popper.min.js"></script>
+<script src="Details_files/libs/quarto-html/tippy.umd.min.js"></script>
+<script src="Details_files/libs/quarto-html/anchor.min.js"></script>
+<link href="Details_files/libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="Details_files/libs/quarto-html/quarto-syntax-highlighting-cf7929f4d66a2bdccc4ecf0c4d40c672.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="Details_files/libs/bootstrap/bootstrap.min.js"></script>
+<link href="Details_files/libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="Details_files/libs/bootstrap/bootstrap-be823526ab964fb349a0af47fba4db6d.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+<link href="https://fonts.googleapis.com/css2?family=Zen+Kurenaido&amp;display=swap" rel="stylesheet">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+<link href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic&amp;display=swap" rel="stylesheet">
+
+<!-- <style>
+  .navbar-title, .menu-text {
+      font-family: "Zen Kurenaido", sans-serif !important;
+      font-weight: 400;
+      font-style: normal;
+  }
+  h1, .title, .description, .subtitle {
+    font-family: "Zen Kurenaido", sans-serif !important;
+  }
+</style> -->
+
+<!-- <style>
+  .menu-text {
+      font-family: "Gill Sans", sans-serif !important;
+      font-weight: 400;
+      font-style: normal;
+  }
+  .navbar-title {
+      font-family: "Gill Sans", sans-serif !important;
+      font-weight: 400;
+      font-style: normal;
+  }
+</style> -->
+
+  <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
+
+<script type="text/javascript">
+const typesetMath = (el) => {
+  if (window.MathJax) {
+    // MathJax Typeset
+    window.MathJax.typeset([el]);
+  } else if (window.katex) {
+    // KaTeX Render
+    var mathElements = el.getElementsByClassName("math");
+    var macros = [];
+    for (var i = 0; i < mathElements.length; i++) {
+      var texText = mathElements[i].firstChild;
+      if (mathElements[i].tagName == "SPAN") {
+        window.katex.render(texText.data, mathElements[i], {
+          displayMode: mathElements[i].classList.contains('display'),
+          throwOnError: false,
+          macros: macros,
+          fleqn: false
+        });
+      }
+    }
+  }
+}
+window.Quarto = {
+  typesetMath
+};
+</script>
+
+<link rel="stylesheet" href="../../assets/styles.css">
+</head>
+
+<body>
+
+<div id="quarto-content" class="page-columns page-rows-contents page-layout-article">
+<div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+  <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">目次</h2>
+   
+  <ul>
+  <li><a href="#introduction" id="toc-introduction" class="nav-link active" data-scroll-target="#introduction"><span class="header-section-number">1</span> Introduction</a></li>
+  <li><a href="#directory-structure-of-pdmpflux.jlsrc" id="toc-directory-structure-of-pdmpflux.jlsrc" class="nav-link" data-scroll-target="#directory-structure-of-pdmpflux.jlsrc"><span class="header-section-number">2</span> Directory Structure of <code>PDMPFlux.jl/src</code></a>
+  <ul class="collapse">
+  <li><a href="#sec-Composites" id="toc-sec-Composites" class="nav-link" data-scroll-target="#sec-Composites"><span class="header-section-number">2.1</span> <code>Composites.jl</code></a></li>
+  <li><a href="#sec-sample" id="toc-sec-sample" class="nav-link" data-scroll-target="#sec-sample"><span class="header-section-number">2.2</span> <code>sample.jl</code></a></li>
+  <li><a href="#sec-SamplingLoop" id="toc-sec-SamplingLoop" class="nav-link" data-scroll-target="#sec-SamplingLoop"><span class="header-section-number">2.3</span> <code>SamplingLoop.jl</code></a></li>
+  <li><a href="#sec-UpperBound" id="toc-sec-UpperBound" class="nav-link" data-scroll-target="#sec-UpperBound"><span class="header-section-number">2.4</span> <code>UpperBound.jl</code></a></li>
+  <li><a href="#diagnostic.jl" id="toc-diagnostic.jl" class="nav-link" data-scroll-target="#diagnostic.jl"><span class="header-section-number">2.5</span> <code>diagnostic.jl</code></a></li>
+  <li><a href="#plot.jl" id="toc-plot.jl" class="nav-link" data-scroll-target="#plot.jl"><span class="header-section-number">2.6</span> <code>plot.jl</code></a></li>
+  </ul></li>
+  <li><a href="#implementation-of-the-samplers" id="toc-implementation-of-the-samplers" class="nav-link" data-scroll-target="#implementation-of-the-samplers"><span class="header-section-number">3</span> Implementation of the Samplers</a>
+  <ul class="collapse">
+  <li><a href="#introduction-1" id="toc-introduction-1" class="nav-link" data-scroll-target="#introduction-1"><span class="header-section-number">3.1</span> Introduction</a></li>
+  <li><a href="#sec-AbstractPDMP" id="toc-sec-AbstractPDMP" class="nav-link" data-scroll-target="#sec-AbstractPDMP"><span class="header-section-number">3.2</span> <code>Samplers/AbstractPDMP.jl</code></a></li>
+  <li><a href="#samplerszigzagsamplers.jl" id="toc-samplerszigzagsamplers.jl" class="nav-link" data-scroll-target="#samplerszigzagsamplers.jl"><span class="header-section-number">3.3</span> <code>Samplers/ZigZagSamplers.jl</code></a></li>
+  <li><a href="#samplersbouncyparticlesamplers.jl" id="toc-samplersbouncyparticlesamplers.jl" class="nav-link" data-scroll-target="#samplersbouncyparticlesamplers.jl"><span class="header-section-number">3.4</span> <code>Samplers/BouncyParticleSamplers.jl</code></a></li>
+  <li><a href="#samplersforwardeventchainmontecarlo.jl" id="toc-samplersforwardeventchainmontecarlo.jl" class="nav-link" data-scroll-target="#samplersforwardeventchainmontecarlo.jl"><span class="header-section-number">3.5</span> <code>Samplers/ForwardEventChainMonteCarlo.jl</code></a></li>
+  <li><a href="#samplersstickyzigzagsamplers.jl" id="toc-samplersstickyzigzagsamplers.jl" class="nav-link" data-scroll-target="#samplersstickyzigzagsamplers.jl"><span class="header-section-number">3.6</span> <code>Samplers/StickyZigZagSamplers.jl</code></a></li>
+  </ul></li>
+  </ul>
+<div class="quarto-alternate-formats"><h2>Other Formats</h2><ul><li><a href="Details.pdf"><i class="bi bi-file-pdf"></i>PDF</a></li></ul></div></nav>
+</div>
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Implementation Details of <code>PDMPFlux.jl</code></h1>
+<p class="subtitle lead">Simulating PDMPs with Automatic Differentiation</p>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    <div>
+    <div class="quarto-title-meta-heading">Author</div>
+    <div class="quarto-title-meta-contents">
+             <p>Hirofumi Shiba </p>
+          </div>
+  </div>
+    
+    <div>
+    <div class="quarto-title-meta-heading">Published</div>
+    <div class="quarto-title-meta-contents">
+      <p class="date">12/31/2024</p>
+    </div>
+  </div>
+  
+    <div>
+    <div class="quarto-title-meta-heading">Modified</div>
+    <div class="quarto-title-meta-contents">
+      <p class="date-modified">1/01/2025</p>
+    </div>
+  </div>
+    
+  </div>
+  
+
+
+</header>
+
+
+<section id="introduction" class="level2" data-number="1">
+<h2 data-number="1" class="anchored" data-anchor-id="introduction"><span class="header-section-number">1</span> Introduction</h2>
+<p>In this introduction, we quickly give an overview of how the PDMPFlux.jl package works, through a standard example.</p>
+<p>Take the Sticky Zig-Zag Sampler <span class="citation" data-cites="Bierkens+2023">[@Bierkens+2023]</span> as an example.</p>
+<ol type="1">
+<li><p><code>sampler = StickyZigZag(dim, ∇U)</code></p>
+<p>This instantiates the sampler, an object of an <code>AbstractPDMP</code> subtype.</p></li>
+<li><p><code>output = sample_skeleton(sampler, N_sk, xinit, vinit)</code></p>
+<p>This takes a sampler object, and returns a <code>PDMPHistory</code> object, by transforming the <code>PDMPState</code> object while pushing its snapshots into the <code>PDMPHistory</code> object.</p></li>
+</ol>
+</section>
+<section id="directory-structure-of-pdmpflux.jlsrc" class="level2" data-number="2">
+<h2 data-number="2" class="anchored" data-anchor-id="directory-structure-of-pdmpflux.jlsrc"><span class="header-section-number">2</span> Directory Structure of <code>PDMPFlux.jl/src</code></h2>
+<section id="sec-Composites" class="level3" data-number="2.1">
+<h3 data-number="2.1" class="anchored" data-anchor-id="sec-Composites"><span class="header-section-number">2.1</span> <code>Composites.jl</code></h3>
+<div class="callout callout-style-simple callout-tip no-icon">
+<div class="callout-body d-flex">
+<div class="callout-icon-container">
+<i class="callout-icon no-icon"></i>
+</div>
+<div class="callout-body-container">
+<p>composites / constructs such as <code>BoundBox</code>, <code>PDMPState</code>, <code>PDMPHistory</code> are defined.</p>
+<ul>
+<li><p><code>BoundBox</code> is basically a grid, together with the values on it, tailored to perform Poisson thinning. 3 constructors are defined in <code>UpperBound.jl</code> <a href="#sec-UpperBound" class="quarto-xref">Section&nbsp;2.4</a>.</p>
+<ul>
+<li><code>boundbox.grid</code> is the grid points. Let the dimension be <code>n_grid</code>, which is a field of any <code>AbstractPDMP</code> subtype.</li>
+<li>The grid is equi-spaced, with the step size <code>step_size</code>.</li>
+<li><code>boundbox.box_max</code> has <code>n_grid - 1</code> elements <span class="math display">\[
+\textcolor{purple}{\mathtt{box\_max[i]}} = \max_{t \in [\textcolor{purple}{\mathtt{grid[i]}}, \textcolor{purple}{\mathtt{grid[i+1]}}]} \lambda(t),\qquad i\in[\textcolor{purple}{\mathtt{n\_grid-1}}].
+\]</span></li>
+<li><code>boundbox.cum_sum</code> has <code>n_grid</code> elements, and <span class="math display">\[
+\textcolor{purple}{\mathtt{cum\_sum[i]}} = \sum_{j=1}^{i-1} \textcolor{purple}{\mathtt{box\_max[j]}}\times\textcolor{purple}{\mathtt{step\_size}},\qquad i\in[\textcolor{purple}{\mathtt{n\_grid}}].
+\]</span> Note that it is not the cumulative sum of <code>box_max</code>, but the cumulative sum of the piecewise constant (upper bound) function represented by <code>box_max</code>’s: <span class="math display">\[
+\textcolor{purple}{\mathtt{cum\_sum[i]}} = \int^i_0\sum_{j=1}^{\textcolor{purple}{\mathtt{n\_grid}-1}}1_{[\textcolor{purple}{\mathtt{grid[j]}}, \textcolor{purple}{\mathtt{grid[j+1]}})}(t)\cdot\textcolor{purple}{\mathtt{box\_max[j]}}\,dt,\qquad i\in[\textcolor{purple}{\mathtt{n\_grid}}].
+\]</span></li>
+</ul></li>
+<li><p><code>PDMPState</code> is used to keep the position of the sampler, together with caracteristics and diagnostic information. The whole <code>SamplingLoop.jl</code> <a href="#sec-SamplingLoop" class="quarto-xref">Section&nbsp;2.3</a> is implemented as a collection of functions that modify the <code>PDMPState</code> object in place. In addition to the <span class="math inline">\((x,v,t)\)</span> tuple, the fields include</p>
+<ul>
+<li>methods specific to the sampler.
+<ul>
+<li><code>state.rate</code> and <code>state.rate_vect</code> are the rate function and its vectorized version. These slots are determined after checking the field <code>pdmp.signed_bound</code> in <code>init_state()</code> in <code>AbstractPDMP.jl</code> <a href="#sec-AbstractPDMP" class="quarto-xref">Section&nbsp;3.2</a>.</li>
+<li><code>state.upper_bound_func()</code> takes <span class="math inline">\((x,v,t)\)</span> and returns the <code>BoundBox</code> object. Basically, <code>state.upper_bound_func()</code> is the only field that differs among samplers.</li>
+<li><code>state.velocity_jump()</code> takes <span class="math inline">\((x,v,t)\)</span> and returns the velocity vector after the PDMP’s jump.</li>
+<li><code>state.flow()</code> takes <span class="math inline">\((x_0,v_0,t)\)</span> and returns <span class="math inline">\((x_t,v_t)\)</span>, which indicates the PDMP’s position after the time <span class="math inline">\(t\)</span> from <span class="math inline">\((x_0,v_0)\)</span>.</li>
+</ul></li>
+<li>fields to facilitate the sampling loop.
+<ul>
+<li>boolean flags to indicate whether Poisson thinning proposal is accepted or not, which is used within <code>ac_step_with_proxy()</code> in the <code>SamplingLoop.jl</code> <a href="#sec-SamplingLoop" class="quarto-xref">Section&nbsp;2.3</a>.</li>
+<li>proposed jump time <code>tp</code> and time already spent <code>ts</code>. They are using in <code>SamplingLoop.jl</code> <a href="#sec-SamplingLoop" class="quarto-xref">Section&nbsp;2.3</a> to conduct poisson thinning, where <code>tp</code> is the proposed jump time, and is added to <code>ts</code> when rejected.</li>
+<li><code>horizon</code> is passed to upper-bounding functions to create a <code>BoundBox</code> object.</li>
+</ul></li>
+<li>statistics to diagnose the sampler dynamic.</li>
+</ul></li>
+</ul>
+</div>
+</div>
+</div>
+</section>
+<section id="sec-sample" class="level3" data-number="2.2">
+<h3 data-number="2.2" class="anchored" data-anchor-id="sec-sample"><span class="header-section-number">2.2</span> <code>sample.jl</code></h3>
+<p><code>sample.jl</code> contains functions, called by users, to start MCMC sampling. The <code>ProgressBar</code> package is used to be friendly to users.</p>
+<div class="callout callout-style-simple callout-tip no-icon">
+<div class="callout-body d-flex">
+<div class="callout-icon-container">
+<i class="callout-icon no-icon"></i>
+</div>
+<div class="callout-body-container">
+<p><code>sample.jl</code> contains 2 functions, and <code>sample()</code> that calls them in sequel.</p>
+<ul>
+<li><code>sample_skeleton() -&gt; PDMPHistory</code> initializes the progress bar and <code>PDMPState</code> &amp; <code>PDMPHistory</code> objects, using <code>init_state()</code> and <code>PDMPHistory()</code> constructor respectively. Then call <code>get_event_state()</code> in <code>SamplingLoop.jl</code> <a href="#sec-SamplingLoop" class="quarto-xref">Section&nbsp;2.3</a> for <code>iter::Int</code> times.</li>
+<li><code>sample_from_skeleton() -&gt; Matrix{Float64}</code> is a function that generates samples, which might subsequently be called by the plotting functions in <code>plot.jl</code>.</li>
+</ul>
+</div>
+</div>
+</div>
+</section>
+<section id="sec-SamplingLoop" class="level3" data-number="2.3">
+<h3 data-number="2.3" class="anchored" data-anchor-id="sec-SamplingLoop"><span class="header-section-number">2.3</span> <code>SamplingLoop.jl</code></h3>
+<p>This module contains 10 functions. Some of them are summarized in the following figure:</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="Files/NewSamplingLoop.jpg" class="img-fluid quarto-figure quarto-figure-center figure-img" style="width:50.0%"></p>
+</figure>
+</div>
+<div class="callout callout-style-simple callout-tip no-icon">
+<div class="callout-body d-flex">
+<div class="callout-icon-container">
+<i class="callout-icon no-icon"></i>
+</div>
+<div class="callout-body-container">
+<p>The main loop for sampling is implemented here.</p>
+<ul>
+<li><p><code>get_event_state() -&gt; PDMPState</code> is the entering point from <code>sample.jl</code>.</p>
+<ul>
+<li><p>There is only one thing in <code>get_event_state()</code>, i.e., callling <code>one_step_of_thinning()</code> until <code>state.accept</code> becomes <code>true</code>.</p></li>
+<li><p><code>get_event_state()</code> returns a <code>PDMPState</code> object with the field <span class="math inline">\((x,v,t)\)</span> indicating where an accepted event happens, which is pushed to <code>PDMPHistory</code> back in <code>sample_skeleton()</code> in <code>sample.jl</code> <a href="#sec-sample" class="quarto-xref">Section&nbsp;2.2</a>.</p></li>
+</ul></li>
+<li><p><code>one_step_of_thinning()</code> returns where simulation has completed up to, with <code>state.accept = false</code> if any proposal isnot accepted yet.</p>
+<ul>
+<li><p>Firstly, it proposes the next jump event, by simulating <code>exp_rv</code> and calling <code>next_event(upper_bound, exp_rv) -&gt; (tp, lambda_bar)</code>.</p>
+<ul>
+<li><code>upper_bound</code> is the <code>BoundBox</code> object, which is calculated by <code>state.upper_bound_func()</code> and the current state <code>(x,v,t)</code>.</li>
+<li><code>tp</code> is the proposed jump time.</li>
+<li><code>lambda_bar</code> is a upper bound, <em>with error</em>, for the rate function <span class="math inline">\(\lambda\)</span>.</li>
+</ul></li>
+<li><p>Secondly, it checks whether <code>tp &lt;= state.horizon</code>.</p>
+<ul>
+<li>If not, it calls <code>move_to_horizon()</code> and continues the loop <code>one_step_of_thinning()</code> inside <code>get_event_state()</code>.</li>
+<li>If yes, it proceeds to <code>moves_until_horizon()</code>, where another loop, calling <code>ac_step()</code>, is performed until one of the following 2 happens
+<ul>
+<li>when <code>state.accept</code> becomes <code>true</code>, it gets out of the both loops.</li>
+<li>when <code>tp &gt; state.horizon</code>, it calls <code>move_to_horizon2()</code> to get out of <code>ac_step()</code> loop, and continues the loop <code>one_step_of_thinning()</code> inside <code>get_event_state()</code>.</li>
+</ul></li>
+</ul></li>
+</ul></li>
+<li><p><code>ac_step()</code>, standing for acceptance-rejection step, is the core of Poisson thinning.</p>
+<ul>
+<li><p>calculating the <strong>acceptance rate</strong> <code>ar</code>, <em>which might exceed <span class="math inline">\(1.0\)</span></em>.</p>
+<p>In that case, <code>erroneous_acceptance_rate()</code> is called to shrink the <code>horizon</code> by half, and then continues the <code>ac_step()</code> loop in <code>moves_until_horizon()</code> function. Shrinking <code>horizon</code> leads to a finer grid, since <code>n_grid</code> is fixed.</p></li>
+<li><p>Otherwise, it performs the Poisson thinning using the proxy rate <code>lambda_bar</code>, in <code>ac_step_with_proxy()</code> call.</p>
+<ul>
+<li>Within <code>ac_step_with_proxy()</code>, either <code>if_accept()</code> or <code>if_reject()</code> is called depending on the result of Poisson thinning, followed by <code>move_to_horizon2()</code> if accepted. Whether accepted or not is informed by <code>state.accept</code> flag, which will lead you out of all the loops.</li>
+<li>In <code>if_accept()</code>, the flags are updated as <code>state.accept = true</code> &amp; <code>state.accept = true</code>, getting out of both <code>ac_step()</code> loop and <code>one_step_of_thinning()</code> loop, with the correct <span class="math inline">\((x,v,t)\)</span> stored in appropriate <code>state</code>’s fields, which is pushed to <code>PDMPHistory</code> back in <code>sample_skeleton()</code> in <code>sample.jl</code> <a href="#sec-sample" class="quarto-xref">Section&nbsp;2.2</a>.</li>
+<li><code>if_reject()</code> being called, we are still in the <code>ac_step()</code> loop in <code>moves_until_horizon()</code>, until acceptance or <code>tp &gt; state.horizon</code>.</li>
+</ul></li>
+</ul></li>
+</ul>
+</div>
+</div>
+</div>
+</section>
+<section id="sec-UpperBound" class="level3" data-number="2.4">
+<h3 data-number="2.4" class="anchored" data-anchor-id="sec-UpperBound"><span class="header-section-number">2.4</span> <code>UpperBound.jl</code></h3>
+<p>This module contains <code>next_event()</code> function and 3 constructors for <code>BoundBox</code> object, with the name of <code>upper_bound_**()</code>.</p>
+<div class="callout callout-style-simple callout-tip no-icon callout-titled" title="3 constructors for `BoundBox` object">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon no-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+3 constructors for <code>BoundBox</code> object
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<div class="sourceCode" id="cb1"><pre class="sourceCode julia code-with-copy"><code class="sourceCode julia"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">upper_bound_**</span>(func<span class="op">::</span><span class="dt">Function</span>, start<span class="op">::</span><span class="dt">Float64</span>, horizon<span class="op">::</span><span class="dt">Float64</span>) <span class="op">-&gt;</span> BoundBox</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<ul>
+<li><p><code>upper_bound_constant()</code> computes the constant upper bound for the function <code>func</code> over the interval <code>[start, horizon]</code>.</p>
+<p>Technically, it returns the <code>BoundBox</code> object, with just 2 grid points, <code>start</code> and <code>horizon</code>. The maximum value is searched by the Brent’s algorithm via <a href="https://github.com/JuliaNLSolvers/Optim.jl"><code>Optim.jl</code> package</a>.</p></li>
+<li><p><code>upper_bound_grid()</code> computes a piecewise constant upper bound, using the <code>n_grid</code> grid points.</p>
+<p>The <code>box_max[i]</code> field is the maximum value of the three points in the interval <code>[grid[i], grid[i+1]]</code>, which are the values on the two edges <code>func(grid[i])</code>, <code>func(grid[i+1])</code>, and the intersection point of the two tangents on the two edges of the interval.</p></li>
+<li><p><code>upper_bound_grid_vect()</code> is a <code>LinearAlgebra</code> implementation of <code>upper_bound_grid()</code>.</p></li>
+</ul>
+</div>
+</div>
+<div class="callout callout-style-simple callout-tip no-icon callout-titled" title="`next_event(boundbox, exp_rv)` takes `boundbox` to propose a next event time">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon no-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<code>next_event(boundbox, exp_rv)</code> takes <code>boundbox</code> to propose a next event time
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<div class="sourceCode" id="cb2"><pre class="sourceCode julia code-with-copy"><code class="sourceCode julia"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>index <span class="op">=</span> <span class="fu">searchsortedfirst</span>(boundbox.cum_sum, exp_rv)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p>is performed to find the <code>index</code> that satisfies</p>
+<p><span class="math display">\[
+\textcolor{purple}{\mathtt{exp\_rv}} \in \left[\textcolor{purple}{\mathtt{cum\_sum[index-1]}}, \textcolor{purple}{\mathtt{cum\_sum[index]}}\right).
+\]</span></p>
+<p>Finally, <code>t_prop</code> that satisfies</p>
+<p><span class="math display">\[
+\int^\textcolor{purple}{\mathtt{t\_prop}}_0 \overline{\lambda}(t)\,dt = \textcolor{purple}{\mathtt{exp\_rv}},
+\]</span> where <span class="math inline">\(\overline{\lambda}(t)\)</span> is the piecewise constant upper-bounding function defined by <span class="math display">\[
+\overline{\lambda}(t) = \sum_{j=1}^{\textcolor{purple}{\mathtt{n\_grid}-1}}1_{[\textcolor{purple}{\mathtt{grid[j]}}, \textcolor{purple}{\mathtt{grid[j+1]}})}(t)\cdot\textcolor{purple}{\mathtt{box\_max[j]}}.
+\]</span></p>
+<p><code>next_event()</code> returns the jump time <code>t_prop</code> and the corresponding upper bound value <code>upper_bound</code>, i.e., <span class="math display">\[
+\textcolor{purple}{\mathtt{upper\_bound}} = \overline{\lambda}(\textcolor{purple}{\mathtt{t\_prop}}) = \textcolor{purple}{\mathtt{box\_max[index-1]}}.
+\]</span></p>
+</div>
+</div>
+</section>
+<section id="diagnostic.jl" class="level3" data-number="2.5">
+<h3 data-number="2.5" class="anchored" data-anchor-id="diagnostic.jl"><span class="header-section-number">2.5</span> <code>diagnostic.jl</code></h3>
+<div class="sourceCode" id="cb3"><pre class="sourceCode julia code-with-copy"><code class="sourceCode julia"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="kw">function</span> <span class="fu">anim_traj</span>(</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>    history<span class="op">::</span><span class="dt">PDMPHistory</span>, </span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>    T_max<span class="op">::</span><span class="dt">Int</span>; </span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>    T_start<span class="op">::</span><span class="dt">Int</span>=<span class="fl">1</span>, </span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>    plot_start<span class="op">::</span><span class="dt">Int</span>=<span class="fl">1</span>, </span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>    filename<span class="op">::</span><span class="dt">Union{String, Nothing}</span>=<span class="cn">nothing</span>, </span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>    plot_type<span class="op">=</span><span class="st">"2D"</span>, </span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>    color<span class="op">=</span><span class="st">"#78C2AD"</span>, </span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>    background<span class="op">=</span><span class="st">"#FFF"</span>, </span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a>    coordinate_numbers<span class="op">=</span>[<span class="fl">1</span>,<span class="fl">2</span>,<span class="fl">3</span>], </span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a>    dt<span class="op">::</span><span class="dt">Float64</span>=<span class="fl">0.1</span>, </span>
+<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a>    verbose<span class="op">::</span><span class="dt">Bool</span>=<span class="cn">true</span>, </span>
+<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a>    fps<span class="op">::</span><span class="dt">Int</span>=<span class="fl">60</span>, </span>
+<span id="cb3-14"><a href="#cb3-14" aria-hidden="true" tabindex="-1"></a>    frame_upper_limit<span class="op">::</span><span class="dt">Int</span>=<span class="fl">10000</span>, </span>
+<span id="cb3-15"><a href="#cb3-15" aria-hidden="true" tabindex="-1"></a>    linewidth<span class="op">=</span><span class="fl">2</span>, </span>
+<span id="cb3-16"><a href="#cb3-16" aria-hidden="true" tabindex="-1"></a>    dynamic_range<span class="op">::</span><span class="dt">Bool</span>=<span class="cn">false</span></span>
+<span id="cb3-17"><a href="#cb3-17" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</section>
+<section id="plot.jl" class="level3" data-number="2.6">
+<h3 data-number="2.6" class="anchored" data-anchor-id="plot.jl"><span class="header-section-number">2.6</span> <code>plot.jl</code></h3>
+<div class="callout callout-style-simple callout-tip no-icon">
+<div class="callout-body d-flex">
+<div class="callout-icon-container">
+<i class="callout-icon no-icon"></i>
+</div>
+<div class="callout-body-container">
+<p>This file contains functions to plot the samples generated by <code>sample.jl</code>.</p>
+</div>
+</div>
+</div>
+</section>
+</section>
+<section id="implementation-of-the-samplers" class="level2" data-number="3">
+<h2 data-number="3" class="anchored" data-anchor-id="implementation-of-the-samplers"><span class="header-section-number">3</span> Implementation of the Samplers</h2>
+<section id="introduction-1" class="level3" data-number="3.1">
+<h3 data-number="3.1" class="anchored" data-anchor-id="introduction-1"><span class="header-section-number">3.1</span> Introduction</h3>
+<p>All samplers are defined as subtypes of <code>AbstractPDMP</code> in <code>Samplers/AbstractPDMP.jl</code> <a href="#sec-AbstractPDMP" class="quarto-xref">Section&nbsp;3.2</a>.</p>
+<p>Different samplers have four different fields in <code>PDMPState</code> object, which are <code>upper_bound_func</code>, <code>rate</code>, <code>rate_vect</code>, and <code>velocity_jump</code>, as we learned in <a href="#sec-Composites" class="quarto-xref">Section&nbsp;2.1</a>.</p>
+<p>The four special fields are initialized in the constructor defined in the respective <code>Samplers/&lt;Name&gt;.jl</code> module.</p>
+</section>
+<section id="sec-AbstractPDMP" class="level3" data-number="3.2">
+<h3 data-number="3.2" class="anchored" data-anchor-id="sec-AbstractPDMP"><span class="header-section-number">3.2</span> <code>Samplers/AbstractPDMP.jl</code></h3>
+<p>This module contains one line</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode julia code-with-copy"><code class="sourceCode julia"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="kw">abstract type</span> AbstractPDMP <span class="kw">end</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p>and one function, whose signature is</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode julia code-with-copy"><code class="sourceCode julia"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="fu">init_state</span>(pdmp<span class="op">::</span><span class="dt">AbstractPDMP</span>, xinit<span class="op">::</span><span class="dt">Array{Float64}</span>, vinit<span class="op">::</span><span class="dt">Array{Float64}</span>, seed<span class="op">::</span><span class="dt">Int</span>) <span class="op">-&gt;</span> PDMPState</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p>This <code>init_state()</code> is basically a constructor for <code>PDMPState</code>, called in <code>sample_skeleton()</code> <a href="#sec-sample" class="quarto-xref">Section&nbsp;2.2</a>.</p>
+<p>It is defined in <code>AbstractPDMP.jl</code> because the composite <code>PDMPState</code> must have different field values depending on the type of the argument <code>pdmp</code>.</p>
+<div class="callout callout-style-simple callout-tip no-icon callout-titled" title="`init_state()` mainly does two things">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon no-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<code>init_state()</code> mainly does two things
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<ol type="1">
+<li>Check the field <code>pdmp.signed_bound</code> and modify the 3 fields <code>rate</code>, <code>rate_vect</code>, <code>refresh_rate</code> accordingly, which were already initialized in the respective constructor of <code>pdmp</code>.</li>
+<li>Check the field <code>pdmp.grid_size</code> &amp; <code>pdmp.vectorized_bound</code> and initialize the field <code>upper_bound_func</code> as one of the functions in the <code>UpperBound.jl</code> <a href="#sec-UpperBound" class="quarto-xref">Section&nbsp;2.4</a> module accordingly.</li>
+</ol>
+</div>
+</div>
+<p>The remaining special fields, <code>velocity_jump</code> and <code>flow</code> are defined, together with initialization of <code>rate</code> and <code>rate_vect</code>, in the sampler specific modules, to which we will turnin the following sections.</p>
+</section>
+<section id="samplerszigzagsamplers.jl" class="level3" data-number="3.3">
+<h3 data-number="3.3" class="anchored" data-anchor-id="samplerszigzagsamplers.jl"><span class="header-section-number">3.3</span> <code>Samplers/ZigZagSamplers.jl</code></h3>
+<p>In this module, the declaration</p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode julia code-with-copy"><code class="sourceCode julia"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="kw">mutable struct</span> ZigZag <span class="op">&lt;:</span><span class="dt"> AbstractPDMP</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p>is followed by the 2 constructors, <code>ZigZag()</code> and <code>ZigZagAD()</code>, whose signatures are</p>
+<div class="sourceCode" id="cb7"><pre class="sourceCode julia code-with-copy"><code class="sourceCode julia"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="kw">function</span> <span class="fu">ZigZag</span>(dim<span class="op">::</span><span class="dt">Int</span>, ∇U<span class="op">::</span><span class="dt">Function</span>; refresh_rate<span class="op">::</span><span class="dt">Float64</span>=<span class="fl">0.0</span>, grid_size<span class="op">::</span><span class="dt">Int</span>=<span class="fl">10</span>, tmax<span class="op">::</span><span class="dt">Union{Float64, Int}</span>=<span class="fl">2.0</span>, </span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>                    vectorized_bound<span class="op">::</span><span class="dt">Bool</span>=<span class="cn">true</span>, signed_bound<span class="op">::</span><span class="dt">Bool</span>=<span class="cn">true</span>, adaptive<span class="op">::</span><span class="dt">Bool</span>=<span class="cn">true</span>)</span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a><span class="kw">function</span> <span class="fu">ZigZagAD</span>(dim<span class="op">::</span><span class="dt">Int</span>, U<span class="op">::</span><span class="dt">Function</span>; refresh_rate<span class="op">::</span><span class="dt">Float64</span>=<span class="fl">0.0</span>, grid_size<span class="op">::</span><span class="dt">Int</span>=<span class="fl">10</span>, tmax<span class="op">::</span><span class="dt">Union{Float64, Int}</span>=<span class="fl">2.0</span>, </span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>                    vectorized_bound<span class="op">::</span><span class="dt">Bool</span>=<span class="cn">true</span>, signed_bound<span class="op">::</span><span class="dt">Bool</span>=<span class="cn">true</span>, adaptive<span class="op">::</span><span class="dt">Bool</span>=<span class="cn">true</span>, AD_backend<span class="op">::</span><span class="dt">String</span>=<span class="st">"Zygote"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p>Notice the difference in <code>∇U</code> and <code>U</code> in the arguments.</p>
+<div class="callout callout-style-simple callout-tip no-icon callout-titled" title="In `ZigZag()` and `ZigZagAD()`, two fields are initialized">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon no-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+In <code>ZigZag()</code> and <code>ZigZagAD()</code>, two fields are initialized
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<ol type="1">
+<li><code>flow</code> is defined as</li>
+</ol>
+<p><span class="math display">\[
+  \textcolor{purple}{\mathtt{flow}}\,(x_0,v_0,t) =(x_0+v_0t, v_0)
+  \]</span></p>
+<ol start="2" type="1">
+<li><p><code>rate_vect</code> is defined component-wisely as</p>
+<p><span class="math display">\[
+\textcolor{purple}{\mathtt{rate\_vect[i]}}(x_0,v_0,t) = \max(0, \nabla U_i(x_0+v_0t)v_0),
+\]</span> where <span class="math inline">\(\nabla U=(\nabla U_1,\dots,\nabla U_d)^\top\)</span> is the gradient <span class="math inline">\(\nabla U:\mathbb{R}^d\to\mathbb{R}^d\)</span>.</p>
+<p><code>rate</code> is the sum of <code>rate_vect</code>, i.e.,</p>
+<p><span class="math display">\[
+\textcolor{purple}{\mathtt{rate}}(x_0,v_0,t) = \sum_{i=1}^d \textcolor{purple}{\mathtt{rate\_vect[i]}}(x_0,v_0,t).
+\]</span></p>
+<p><code>signed_rate_vect</code> is a version of <code>rate_vect</code> without taking the <code>max</code> with <span class="math inline">\(0\)</span>.</p></li>
+</ol>
+</div>
+</div>
+<p>Two flags <code>signed_bound</code> and <code>vectorized_bound</code> are <code>true</code> in default, in which case <code>signed_rate_vect</code> is used.</p>
+<p>This is called the <em>signed strategy</em>, detailed in <span class="citation" data-cites="Andral-Kamatani2024">[Section 4.4.2 @Andral-Kamatani2024]</span>.</p>
+<p>The <code>vectorized_bound</code> is also special to the Zig-Zag samplers.</p>
+</section>
+<section id="samplersbouncyparticlesamplers.jl" class="level3" data-number="3.4">
+<h3 data-number="3.4" class="anchored" data-anchor-id="samplersbouncyparticlesamplers.jl"><span class="header-section-number">3.4</span> <code>Samplers/BouncyParticleSamplers.jl</code></h3>
+<p>Similar to the Zig-Zag samplers, mutable struct <code>BPS</code> and 2 constructors <code>BPS()</code> and <code>BPSAD()</code> are defined.</p>
+<p>Difference is that, in <code>BPS</code>, vectorization is not used, therefore <code>vectorized_bound=false</code> no matter what the user specifies.</p>
+<p>Note that typically Bouncy Particle Samplers need nonzero refresh rate, therefore <code>refresh_rate=0.0</code> would result in erronous samples.</p>
+</section>
+<section id="samplersforwardeventchainmontecarlo.jl" class="level3" data-number="3.5">
+<h3 data-number="3.5" class="anchored" data-anchor-id="samplersforwardeventchainmontecarlo.jl"><span class="header-section-number">3.5</span> <code>Samplers/ForwardEventChainMonteCarlo.jl</code></h3>
+<p>Forward ECMC (Event Chain Monte Carlo) is a generalizatione of the Bouncy Particle Sampler, being free from the need of refreshing, substituting it with a ‘informed’ velocity jump.</p>
+<p>Regarding the implementation, however, note there is an error in the pseudo-code of <span class="citation" data-cites="Michel+2020">[@Michel+2020]</span>’s paper, and in the implementation of the <code>pdmp_jax</code> package.</p>
+<p>To sum it up, the velocity jump is implemented separately on <span class="math inline">\(\mathbb{R}\nabla U\)</span> and <span class="math inline">\((\mathbb{R}\nabla U)^\perp\)</span>. To the former, the velocity is newly sampled from the invariant distribution directly, while to the latter, occasionally (tuned by <code>mix_p</code>) only two dimensions of them are changed. (If <code>ran_p=false</code>, they are swaped.)</p>
+<p>As a result, the sampler loses ergodicity and confined to a certain subspace when, for example, <span class="math inline">\(U\)</span> is completely isotropic and the initial velocity is proportional to its contours.</p>
+</section>
+<section id="samplersstickyzigzagsamplers.jl" class="level3" data-number="3.6">
+<h3 data-number="3.6" class="anchored" data-anchor-id="samplersstickyzigzagsamplers.jl"><span class="header-section-number">3.6</span> <code>Samplers/StickyZigZagSamplers.jl</code></h3>
+<p>This module implements the Sticky Zig-Zag sampler, for variable selection with the spike-and-slab prior.</p>
+<p>The sampler takes additional argument <code>κ</code>, which has to be positive <code>Float64</code> or <code>Inf</code>, determining (inverse) frequency of the sticking behaviour.</p>
+<div class="callout callout-style-simple callout-tip no-icon">
+<div class="callout-body d-flex">
+<div class="callout-icon-container">
+<i class="callout-icon no-icon"></i>
+</div>
+<div class="callout-body-container">
+<ul>
+<li>In one step of <code>one_step_of_thinning_or_sticking_or_thawing()</code>, it is first checked whether the sampler crosses any axes by <span class="math inline">\(\min(\textcolor{purple}{\mathtt{tp}}, \textcolor{purple}{\mathtt{tt}}, \textcolor{purple}{\mathtt{horizon}})0\)</span>.
+<ul>
+<li>If it does cross, <code>move_to_axes_and_stick()</code> is called.</li>
+<li>Else, <span class="math inline">\(\min(\textcolor{purple}{\mathtt{tp}}, \textcolor{purple}{\mathtt{tt}}) &gt; \textcolor{purple}{\mathtt{horizon}}\)</span> is checked.
+<ul>
+<li>If it is true, <code>move_to_horizon()</code> is called.</li>
+</ul></li>
+<li>Else, <code>moves_until_horizon_or_axes()</code> is called.
+<ul>
+<li></li>
+</ul></li>
+</ul></li>
+</ul>
+</div>
+</div>
+</div>
+</section>
+</section>
+
+</main>
+<!-- /main column -->
+<script id="quarto-html-after-body" type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const toggleBodyColorMode = (bsSheetEl) => {
+    const mode = bsSheetEl.getAttribute("data-mode");
+    const bodyEl = window.document.querySelector("body");
+    if (mode === "dark") {
+      bodyEl.classList.add("quarto-dark");
+      bodyEl.classList.remove("quarto-light");
+    } else {
+      bodyEl.classList.add("quarto-light");
+      bodyEl.classList.remove("quarto-dark");
+    }
+  }
+  const toggleBodyColorPrimary = () => {
+    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+    if (bsSheetEl) {
+      toggleBodyColorMode(bsSheetEl);
+    }
+  }
+  toggleBodyColorPrimary();  
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const isCodeAnnotation = (el) => {
+    for (const clz of el.classList) {
+      if (clz.startsWith('code-annotation-')) {                     
+        return true;
+      }
+    }
+    return false;
+  }
+  const onCopySuccess = function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    var currentTitle = button.getAttribute("title");
+    button.setAttribute("title", "Copied!");
+    let tooltip;
+    if (window.bootstrap) {
+      button.setAttribute("data-bs-toggle", "tooltip");
+      button.setAttribute("data-bs-placement", "left");
+      button.setAttribute("data-bs-title", "Copied!");
+      tooltip = new bootstrap.Tooltip(button, 
+        { trigger: "manual", 
+          customClass: "code-copy-button-tooltip",
+          offset: [0, -8]});
+      tooltip.show();    
+    }
+    setTimeout(function() {
+      if (tooltip) {
+        tooltip.hide();
+        button.removeAttribute("data-bs-title");
+        button.removeAttribute("data-bs-toggle");
+        button.removeAttribute("data-bs-placement");
+      }
+      button.setAttribute("title", currentTitle);
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  }
+  const getTextToCopy = function(trigger) {
+      const codeEl = trigger.previousElementSibling.cloneNode(true);
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+  }
+  const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+    text: getTextToCopy
+  });
+  clipboard.on('success', onCopySuccess);
+  if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+    const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+      text: getTextToCopy,
+      container: window.document.getElementById('quarto-embedded-source-code-modal')
+    });
+    clipboardModal.on('success', onCopySuccess);
+  }
+    var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+    var mailtoRegex = new RegExp(/^mailto:/);
+      var filterRegex = new RegExp('/' + window.location.host + '/');
+    var isInternal = (href) => {
+        return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+    }
+    // Inspect non-navigation links and adorn them if external
+ 	var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+    for (var i=0; i<links.length; i++) {
+      const link = links[i];
+      if (!isInternal(link.href)) {
+        // undo the damage that might have been done by quarto-nav.js in the case of
+        // links that we want to consider external
+        if (link.dataset.originalHref !== undefined) {
+          link.href = link.dataset.originalHref;
+        }
+      }
+    }
+  function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+    const config = {
+      allowHTML: true,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start',
+    };
+    if (contentFn) {
+      config.content = contentFn;
+    }
+    if (onTriggerFn) {
+      config.onTrigger = onTriggerFn;
+    }
+    if (onUntriggerFn) {
+      config.onUntrigger = onUntriggerFn;
+    }
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      // use id or data attribute instead here
+      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      if (note) {
+        return note.innerHTML;
+      } else {
+        return "";
+      }
+    });
+  }
+  const xrefs = window.document.querySelectorAll('a.quarto-xref');
+  const processXRef = (id, note) => {
+    // Strip column container classes
+    const stripColumnClz = (el) => {
+      el.classList.remove("page-full", "page-columns");
+      if (el.children) {
+        for (const child of el.children) {
+          stripColumnClz(child);
+        }
+      }
+    }
+    stripColumnClz(note)
+    if (id === null || id.startsWith('sec-')) {
+      // Special case sections, only their first couple elements
+      const container = document.createElement("div");
+      if (note.children && note.children.length > 2) {
+        container.appendChild(note.children[0].cloneNode(true));
+        for (let i = 1; i < note.children.length; i++) {
+          const child = note.children[i];
+          if (child.tagName === "P" && child.innerText === "") {
+            continue;
+          } else {
+            container.appendChild(child.cloneNode(true));
+            break;
+          }
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(container);
+        }
+        return container.innerHTML
+      } else {
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        return note.innerHTML;
+      }
+    } else {
+      // Remove any anchor links if they are present
+      const anchorLink = note.querySelector('a.anchorjs-link');
+      if (anchorLink) {
+        anchorLink.remove();
+      }
+      if (window.Quarto?.typesetMath) {
+        window.Quarto.typesetMath(note);
+      }
+      if (note.classList.contains("callout")) {
+        return note.outerHTML;
+      } else {
+        return note.innerHTML;
+      }
+    }
+  }
+  for (var i=0; i<xrefs.length; i++) {
+    const xref = xrefs[i];
+    tippyHover(xref, undefined, function(instance) {
+      instance.disable();
+      let url = xref.getAttribute('href');
+      let hash = undefined; 
+      if (url.startsWith('#')) {
+        hash = url;
+      } else {
+        try { hash = new URL(url).hash; } catch {}
+      }
+      if (hash) {
+        const id = hash.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note !== null) {
+          try {
+            const html = processXRef(id, note.cloneNode(true));
+            instance.setContent(html);
+          } finally {
+            instance.enable();
+            instance.show();
+          }
+        } else {
+          // See if we can fetch this
+          fetch(url.split('#')[0])
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.getElementById(id);
+            if (note !== null) {
+              const html = processXRef(id, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      } else {
+        // See if we can fetch a full url (with no hash to target)
+        // This is a special case and we should probably do some content thinning / targeting
+        fetch(url)
+        .then(res => res.text())
+        .then(html => {
+          const parser = new DOMParser();
+          const htmlDoc = parser.parseFromString(html, "text/html");
+          const note = htmlDoc.querySelector('main.content');
+          if (note !== null) {
+            // This should only happen for chapter cross references
+            // (since there is no id in the URL)
+            // remove the first header
+            if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+              note.children[0].remove();
+            }
+            const html = processXRef(null, note);
+            instance.setContent(html);
+          } 
+        }).finally(() => {
+          instance.enable();
+          instance.show();
+        });
+      }
+    }, function(instance) {
+    });
+  }
+      let selectedAnnoteEl;
+      const selectorForAnnotation = ( cell, annotation) => {
+        let cellAttr = 'data-code-cell="' + cell + '"';
+        let lineAttr = 'data-code-annotation="' +  annotation + '"';
+        const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+        return selector;
+      }
+      const selectCodeLines = (annoteEl) => {
+        const doc = window.document;
+        const targetCell = annoteEl.getAttribute("data-target-cell");
+        const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+        const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+        const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+        const lineIds = lines.map((line) => {
+          return targetCell + "-" + line;
+        })
+        let top = null;
+        let height = null;
+        let parent = null;
+        if (lineIds.length > 0) {
+            //compute the position of the single el (top and bottom and make a div)
+            const el = window.document.getElementById(lineIds[0]);
+            top = el.offsetTop;
+            height = el.offsetHeight;
+            parent = el.parentElement.parentElement;
+          if (lineIds.length > 1) {
+            const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+            const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+            height = bottom - top;
+          }
+          if (top !== null && height !== null && parent !== null) {
+            // cook up a div (if necessary) and position it 
+            let div = window.document.getElementById("code-annotation-line-highlight");
+            if (div === null) {
+              div = window.document.createElement("div");
+              div.setAttribute("id", "code-annotation-line-highlight");
+              div.style.position = 'absolute';
+              parent.appendChild(div);
+            }
+            div.style.top = top - 2 + "px";
+            div.style.height = height + 4 + "px";
+            div.style.left = 0;
+            let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+            if (gutterDiv === null) {
+              gutterDiv = window.document.createElement("div");
+              gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+              gutterDiv.style.position = 'absolute';
+              const codeCell = window.document.getElementById(targetCell);
+              const gutter = codeCell.querySelector('.code-annotation-gutter');
+              gutter.appendChild(gutterDiv);
+            }
+            gutterDiv.style.top = top - 2 + "px";
+            gutterDiv.style.height = height + 4 + "px";
+          }
+          selectedAnnoteEl = annoteEl;
+        }
+      };
+      const unselectCodeLines = () => {
+        const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+        elementsIds.forEach((elId) => {
+          const div = window.document.getElementById(elId);
+          if (div) {
+            div.remove();
+          }
+        });
+        selectedAnnoteEl = undefined;
+      };
+        // Handle positioning of the toggle
+    window.addEventListener(
+      "resize",
+      throttle(() => {
+        elRect = undefined;
+        if (selectedAnnoteEl) {
+          selectCodeLines(selectedAnnoteEl);
+        }
+      }, 10)
+    );
+    function throttle(fn, ms) {
+    let throttle = false;
+    let timer;
+      return (...args) => {
+        if(!throttle) { // first call gets through
+            fn.apply(this, args);
+            throttle = true;
+        } else { // all the others get throttled
+            if(timer) clearTimeout(timer); // cancel #2
+            timer = setTimeout(() => {
+              fn.apply(this, args);
+              timer = throttle = false;
+            }, ms);
+        }
+      };
+    }
+      const annoteTargets = window.document.querySelectorAll('.code-annotation-anchor');
+      for (let i=0; i<annoteTargets.length; i++) {
+        const annoteTarget = annoteTargets[i];
+        const targetCell = annoteTarget.getAttribute("data-target-cell");
+        const targetAnnotation = annoteTarget.getAttribute("data-target-annotation");
+        const contentFn = () => {
+          const content = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          if (content) {
+            const tipContent = content.cloneNode(true);
+            tipContent.classList.add("code-annotation-tip-content");
+            return tipContent.outerHTML;
+          }
+        }
+        const config = {
+          allowHTML: true,
+          content: contentFn,
+          onShow: (instance) => {
+            selectCodeLines(instance.reference);
+            instance.reference.classList.add('code-annotation-active');
+            window.tippy.hideAll();
+          },
+          onHide: (instance) => {
+            unselectCodeLines();
+            instance.reference.classList.remove('code-annotation-active');
+          },
+          maxWidth: 300,
+          delay: [50, 0],
+          duration: [200, 0],
+          offset: [5, 10],
+          arrow: true,
+          trigger: 'click',
+          appendTo: function(el) {
+            return el.parentElement.parentElement.parentElement;
+          },
+          interactive: true,
+          interactiveBorder: 10,
+          theme: 'quarto',
+          placement: 'right',
+          positionFixed: true,
+          popperOptions: {
+            modifiers: [
+            {
+              name: 'flip',
+              options: {
+                flipVariations: false, // true by default
+                allowedAutoPlacements: ['right'],
+                fallbackPlacements: ['right', 'top', 'top-start', 'top-end', 'bottom', 'bottom-start', 'bottom-end', 'left'],
+              },
+            },
+            {
+              name: 'preventOverflow',
+              options: {
+                mainAxis: false,
+                altAxis: false
+              }
+            }
+            ]        
+          }      
+        };
+        window.tippy(annoteTarget, config); 
+      }
+  const findCites = (el) => {
+    const parentEl = el.parentElement;
+    if (parentEl) {
+      const cites = parentEl.dataset.cites;
+      if (cites) {
+        return {
+          el,
+          cites: cites.split(' ')
+        };
+      } else {
+        return findCites(el.parentElement)
+      }
+    } else {
+      return undefined;
+    }
+  };
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const citeInfo = findCites(ref);
+    if (citeInfo) {
+      tippyHover(citeInfo.el, function() {
+        var popup = window.document.createElement('div');
+        citeInfo.cites.forEach(function(cite) {
+          var citeDiv = window.document.createElement('div');
+          citeDiv.classList.add('hanging-indent');
+          citeDiv.classList.add('csl-entry');
+          var biblioDiv = window.document.getElementById('ref-' + cite);
+          if (biblioDiv) {
+            citeDiv.innerHTML = biblioDiv.innerHTML;
+          }
+          popup.appendChild(citeDiv);
+        });
+        return popup.innerHTML;
+      });
+    }
+  }
+});
+</script>
+</div> <!-- /content -->
+
+
+
+
+</body></html>

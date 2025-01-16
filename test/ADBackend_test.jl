@@ -1,6 +1,6 @@
 using PDMPFlux
 
-using Random, Distributions, Plots, LaTeXStrings, ForwardDiff, LinearAlgebra
+using Random, Distributions, Plots, LaTeXStrings, ForwardDiff, LinearAlgebra, PolyesterForwardDiff, Zygote, Enzyme
 
 function U(x::Vector{Float64})
     v = x[1]
@@ -25,7 +25,19 @@ function V(x::Vector)
 end
 
 function run_ZigZag_on_funnel(N_sk::Int=100_000, N::Int=100_000, d::Int=10)
-    ∇U(x::Vector{Float64}) = ForwardDiff.gradient(V, x)
+
+    # function ∇U(x::Vector{Float64})
+    #     dx = similar(x)
+    #     PolyesterForwardDiff.threaded_gradient!(V, dx, x, ForwardDiff.Chunk(8))
+    #     return dx
+    # end
+
+    # ∇U(x::Vector{Float64}) = ForwardDiff.gradient(V, x)
+    
+    # ∇U(x::Vector{Float64}) = vec(Zygote.jacobian(V, x)[1])
+
+    # ∇U(x::Vector{Float64}) =  autodiff(ForwardWithPrimal, V, x, Duplicated(3.0, 1.0))
+    
     xinit = ones(d)
     vinit = ones(d)
     seed = 2024
@@ -36,6 +48,10 @@ function run_ZigZag_on_funnel(N_sk::Int=100_000, N::Int=100_000, d::Int=10)
     return out, samples
 end
 output, samples = run_ZigZag_on_funnel()  # 05:29<00:00 → 00:20<00:00
+# 1:09 for Zygote
+# 0:22 for ForwardDiff
+# 0:18 for PolyesterForwardDiff
+
 
 jointplot(samples)
 plot_traj(output, 10000)

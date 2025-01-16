@@ -6,24 +6,12 @@
 
 ## Overview
 
-`PDMPFlux.jl` provides a fast and efficient implementation of **Piecewise Deterministic Markov Process (PDMP)** samplers using a grid-based Poisson thinning approach.
+`PDMPFlux.jl` provides a fast and efficient implementation of **Piecewise Deterministic Markov Process (PDMP)** samplers, using a grid-based Poisson thinning approach proposed in [Andral and Kamatani (2024)](https://arxiv.org/abs/2408.03682).
 
-In this version `v0.2.0`, only Zig-Zag samplers are implemented. We will extend the functionality to include other PDMP samplers in the future.
-
-### Key Features
-
-* To sample from a distribution $p(x)$, the *only* required inputs are its dimension $d$ and the negative log density $U(x)=-\log p(x)$ (up to constant).
-
-
-## Motivation
-
-Markov Chain Monte Carlo (MCMC) methods are standard in sampling from distributions with unknown normalizing constants.
-
-However, PDMPs offer a promising alternative due to their continuous and non-reversible dynamics, particularly in high-dimensional and big data contexts, as discussed in [Bouchard-Côté et. al. (2018)](https://arxiv.org/abs/1510.02451) and [Bierkens et. al. (2019)](https://arxiv.org/abs/1607.03188).
-
-Despite their potential, practical applications of PDMPs remain limited by a lack of efficient and flexible implementations.
-
-`PDMPFlux.jl` is my attempt to fill this gap, with the aid of the existing automatic differentiation engines.
+By the means of the automatic differentiation engines, `PDMPFlux.jl` only requires `dim` and `U`, which is the negative log density of the target distribution (e.g., posterior).
+$$
+U(x) = -\log p(x) + \text{const}.
+$$
 
 ## Installation
 
@@ -81,7 +69,7 @@ vinit = ones(dim)
 grid_size = 0  # use constant bounds
 
 sampler = ZigZag(dim, ∇U_banana, grid_size=grid_size)  # manually providing the gradient
-output = sample_skeleton(sampler, N_sk, xinit, vinit, verbose = true)  # simulate skeleton points
+output = sample_skeleton(sampler, N_sk, xinit, vinit)  # simulate skeleton points
 samples = sample_from_skeleton(sampler, N, output)  # get samples from the skeleton points
 
 plot_traj(output, 10000)
@@ -89,6 +77,59 @@ diagnostic(output)
 
 jointplot(samples)
 ```
+
+## Motivation
+
+Markov Chain Monte Carlo (MCMC) methods are standard in sampling from distributions with unknown normalizing constants.
+
+However, PDMPs (also known as Event Chain Monte Carlo) offer a promising alternative due to their 
+
+1. rejection-free simulation strategy,
+2. continuous and non-reversible dynamics,
+
+particularly in high-dimensional and big data contexts, as discussed in [Bouchard-Côté et. al. (2018)](https://arxiv.org/abs/1510.02451) and [Bierkens et. al. (2019)](https://arxiv.org/abs/1607.03188).
+
+Despite their potential, practical applications of PDMPs remained limited by the lack of efficient and flexible implementations.
+
+Inspired by [Andral and Kamatani (2024)](https://arxiv.org/abs/2408.03682) and their `jax` based implementation in [`pdmp_jax`](https://github.com/charlyandral/pdmp_jax),`PDMPFlux.jl` is my attempt to fill this gap, with the aid of the existing automatic differentiation engines.
+
+## Implemented PDMP Samplers
+
+### Zig-Zag Sampler
+
+proposed by [Bierkens, Fearnhead & Roberts (2019)](https://projecteuclid.org/journals/annals-of-statistics/volume-47/issue-3/The-Zig-Zag-process-and-super-efficient-sampling-for-Bayesian/10.1214/18-AOS1715.full).
+
+![](assets/SlantedGauss/ZigZag_SlantedGauss2D.gif)
+
+### Bouncy Particle Sampler (BPS)
+
+proposed by [Bouchard-Côte et. al. (2018)](https://www.tandfonline.com/doi/full/10.1080/01621459.2017.1294075).
+
+![](assets/SlantedGauss/BPS_SlantedGauss2D.gif)
+
+### Forward Event Chain Monte Carlo (Forward ECMC)
+
+proposed by [Michel, Durmus & Sénécal (2020)](https://www.tandfonline.com/doi/full/10.1080/10618600.2020.1750417).
+
+![](assets/SlantedGauss/ForwardECMC_SlantedGauss2D.gif)
+
+### Boomerang Sampler
+
+proposed by [Bierkens et. al. (2020)](https://proceedings.mlr.press/v119/bierkens20a.html).
+
+![](assets/SlantedGauss/Boomerang_SlantedGauss2D.gif)
+
+### Speed Up Zig-Zag (SUZZ)
+
+proposed by [Vasdekis and Roberts (2023)](https://projecteuclid.org/journals/annals-of-applied-probability/volume-33/issue-6A/Speed-up-Zig-Zag/10.1214/23-AAP1930.full).
+
+![](assets/SlantedGauss/SUZZ_SlantedGauss2D.gif)
+
+### Sticky Zig-Zag Sampler
+
+proposed in [Bierkens et. al. (2023)](https://link.springer.com/article/10.1007/s11222-022-10180-5).
+
+![](assets/SlantedGauss/StickyZigZag_SlantedGauss2D.gif)
 
 ## Gallery
 
@@ -133,6 +174,16 @@ jointplot(samples)
             <td align="center"><a href="test/1d_test.jl"><sup>1D</sup> Zig-Zag on Gaussian</a></td>
             <td align="center"><a href="test/1d_test.jl">Cauchy vs. Gaussian Density Plot</a></td>
         </tr>
+        <tr>
+            <td style="width: 33%;"><img src="assets/SlantedGauss/ZigZag_SlantedGauss2D.gif"></td>
+            <td style="width: 33%;"><img src="assets/SlantedGauss/BPS_SlantedGauss2D.gif"></td>
+            <td style="width: 33%;"><img src="assets/SlantedGauss/ForwardECMC_SlantedGauss2D.gif"></td>
+        </tr>
+        <tr>
+            <td style="width: 33%;"><img src="assets/SlantedGauss/Boomerang_SlantedGauss2D.gif"></td>
+            <td style="width: 33%;"><img src="assets/SlantedGauss/SUZZ_SlantedGauss2D.gif"></td>
+            <td style="width: 33%;"><img src="assets/SlantedGauss/StickyZigZag_SlantedGauss2D.gif"></td>
+        </tr>
     </tbody>
 </table>
 
@@ -144,11 +195,16 @@ jointplot(samples)
 
 ## References
 
-* [`pdmp_jax`](https://github.com/charlyandral/pdmp_jax) by [Charly Andral](https://github.com/charlyandral), on which this repository is strongly based on.
+* [`pdmp_jax`](https://github.com/charlyandral/pdmp_jax) by [Charly Andral](https://github.com/charlyandral), on which this repository is strongly based on and indebted to.
   * [Andral and Kamatani (2024) Automated Techniques for Efficient Sampling of Piecewise-Deterministic Markov Processes](https://arxiv.org/abs/2408.03682)
 * [`ForwardDiff.jl`](https://github.com/JuliaDiff/ForwardDiff.jl) and [`Zygote.jl`](https://github.com/FluxML/Zygote.jl) are used for automatic differentiation.
-  * [Revels, Lubin, and Papamarkou (2016) Forward-Mode Automatic Differentiation rin Julia](https://arxiv.org/abs/1607.07892)
+  * [Revels, Lubin, and Papamarkou (2016) Forward-Mode Automatic Differentiation in Julia](https://arxiv.org/abs/1607.07892)
   * [Innes et. al. (2018) Fashionable Modelling with Flux](https://arxiv.org/abs/1811.01457)
 * Other PDMP packages:
-  * Julia package [`ZigZagBoomerang.jl`](https://github.com/mschauer/ZigZagBoomerang.jl) by [Marcel Schauer](https://github.com/mschauer)
-  * R package [`rjpdmp`](https://github.com/matt-sutton/rjpdmp) by [Matthew Sutton](https://github.com/matt-sutton)
+  * Julia
+    * [`ZigZagBoomerang.jl`](https://github.com/mschauer/ZigZagBoomerang.jl) by [Marcel Schauer](https://github.com/mschauer)
+    * [`ZZDiffusionBridge`](https://github.com/SebaGraz/ZZDiffusionBridge) by [Sebastiano Grazzi](https://github.com/SebaGraz)
+    * [`PDSampler.jl`](https://github.com/alan-turing-institute/PDSampler.jl) by [Alan Turing Institute](https://github.com/alan-turing-institute)
+  * R
+    * [`rjpdmp`](https://github.com/matt-sutton/rjpdmp) by [Matthew Sutton](https://github.com/matt-sutton)
+    * [`RZigZag`](https://github.com/jbierkens/RZigZag) by [Joris Bierkens](https://github.com/jbierkens)

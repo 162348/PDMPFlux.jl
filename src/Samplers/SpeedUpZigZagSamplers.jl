@@ -2,7 +2,7 @@ using Random
 using Distributions
 
 """
-    ZigZag(dim::Int, ∇U::Function; grid_size::Int=10, tmax::Float64=1.0, 
+    SpeedUpZigZag(dim::Int, ∇U::Function; grid_size::Int=10, tmax::Float64=1.0, 
         vectorized_bound::Bool=true, signed_bound::Bool=true, adaptive::Bool=true, kwargs...)
 
 # arguments for constructor
@@ -32,7 +32,7 @@ using Distributions
 - `velocity_jump::Function`: 速度ジャンプ関数。
 - `state`: ZigZagサンプラーの状態。
 """
-mutable struct ZigZag <: AbstractPDMP
+mutable struct SpeedUpZigZag <: AbstractPDMP
     dim::Int
     ∇U::Function
     grid_size::Int
@@ -53,7 +53,7 @@ mutable struct ZigZag <: AbstractPDMP
     Constructor for ZigZag sampler
         - `refresh_rate::Float64`: Not yet used 1/13/2025
     """
-    function ZigZag(dim::Int, ∇U::Function; grid_size::Int=10, tmax::Union{Float64, Int}=2.0, 
+    function SpeedUpZigZag(dim::Int, ∇U::Function; grid_size::Int=10, tmax::Union{Float64, Int}=2.0, 
                     refresh_rate::Float64=0.0, vectorized_bound::Bool=true, signed_bound::Bool=true, adaptive::Bool=true)
         
         tmax = Float64(tmax)  # convert tmax to Float64
@@ -66,29 +66,41 @@ mutable struct ZigZag <: AbstractPDMP
             @warn "Signed bound is not compatible with non-vectorized bound for ZigZag, switching to unsigned bound"
         end
 
-        flow = (x, v, t) -> (x .+ v .* t, v)  # AD can flow through this function, thus vectorized.
+        function flow(x, v, t)
+          y = x - v[1] * x[1] * v
+          c = v[1] * (y ⋅ v)
+          a = (1 + y ⋅ y) / dim - (c^2) / (dim^2)
+          Y_0 = x[1] + (c / dim)
+          b_t = (Y_0 + sqrt(Y_0^2 + a)) * exp(sqrt(dim) * v[1] * t)
+          X_1 = (b_t^2 - a) / (2 * b_t) - (c / dim)
+          return y + v[1] * X_1 * v, v
+        end
+
+        speed(x) = sqrt(1.0 + x ⋅ x)
+        ∇speed(x) = x / speed(x)
+        ∇U_effective(x) = speed(x) * ∇U(x) - ∇speed(x)
 
         # Define rate functions
         rate = function _global_rate(x0, v0, t)
             xt, vt = flow(x0, v0, t)
-            return sum(max.(zeros(dim), ∇U(xt) .* vt))
+            return sum(max.(zeros(dim), ∇U_effective(xt) .* vt))
         end
     
         rate_vect = function _global_rate_vectorized(x0, v0, t)
             xt, vt = flow(x0, v0, t)
-            return max.(zeros(dim), ∇U(xt) .* vt)
+            return max.(zeros(dim), ∇U_effective(xt) .* vt)
         end
     
         signed_rate = nothing
     
         signed_rate_vect = function _signed_rate_vect(x0, v0, t)
             xt, vt = flow(x0, v0, t)
-            return ∇U(xt) .* vt
+            return ∇U_effective(xt) .* vt
         end
 
         # Define velocity jump function
         function velocity_jump(x, v, rng)
-            lambda_t = max.(zeros(dim), ∇U(x) .* v)
+            lambda_t = max.(zeros(dim), ∇U_effective(x) .* v)
             p = lambda_t ./ sum(lambda_t)
             m = rand(rng, Categorical(p))
             v[m] *= -1
@@ -100,12 +112,12 @@ mutable struct ZigZag <: AbstractPDMP
     end
 end
 
-function ZigZagAD(dim::Int, U::Function; refresh_rate::Float64=0.0, grid_size::Int=10, tmax::Union{Float64, Int}=2.0, 
+function SpeedUpZigZagAD(dim::Int, U::Function; refresh_rate::Float64=0.0, grid_size::Int=10, tmax::Union{Float64, Int}=2.0, 
                     vectorized_bound::Bool=true, signed_bound::Bool=true, adaptive::Bool=true, AD_backend::String="Zygote")
 
     ∇U = set_AD_backend(AD_backend, U, dim)
 
-    return ZigZag(dim, ∇U, refresh_rate=refresh_rate, grid_size=grid_size, tmax=tmax, vectorized_bound=vectorized_bound, 
+    return SpeedUpZigZag(dim, ∇U, refresh_rate=refresh_rate, grid_size=grid_size, tmax=tmax, vectorized_bound=vectorized_bound, 
                     signed_bound=signed_bound, adaptive=adaptive)
 end
 

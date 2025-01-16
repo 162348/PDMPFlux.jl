@@ -12,10 +12,10 @@ using Random
         step_size (Float64): The step size of the grid.
 """
 struct BoundBox <: Any
-    grid::Vector{Float64}  # "n_grid" dimension
-    box_max::Vector{Float64}  # "n_grid - 1" dimension
-    cum_sum::Vector{Float64}  # "n_grid" dimension
-    step_size::Float64
+    grid::Vector{Float64}  #  grid points, with "n_grid" dimension
+    box_max::Vector{Float64}  #  box_max[i] is the maximum value on the interval [grid[i], grid[i+1]]. Therefore, it has "n_grid - 1" dimension.
+    cum_sum::Vector{Float64}  #  cumulative sum of box_max, with "n_grid" dimension. The first element has to be 0.
+    step_size::Float64  #  step size of the grid
 end
 
 
@@ -28,69 +28,86 @@ end
         x (Array{Float64, 1}): position
         v (Array{Float64, 1}): velocity
         t (Float64): time
-        horizon (Float64): horizon
-        key (Any): random key
-        integrator (Function): integrator function
+        is_active (Array{Bool, 1}): indicator for the freezing state. Used in the sampling loop for Sticky samplers.
+
         ∇U (Function): gradient of the potential function
         rate (Function): rate function
+        flow (Function): flow function
         velocity_jump (Function): velocity jump function
         upper_bound_func (Function): upper bound function
-        accept (Bool): accept indicator for the thinning
         upper_bound (Union{Nothing, NamedTuple}): upper bound box
-        indicator (Bool): indicator for jumping
+
+        lambda_bar (Float64): upper bound for the Poisson process
+        exp_rv (Float64): exponential random variable for the Poisson process
+        
+        lambda_t (Float64): rate at the current time
+        horizon (Float64): horizon
         tp (Float64): time to the next event
         ts (Float64): time spent
-        exp_rv (Float64): exponential random variable for the Poisson process
-        lambda_bar (Float64): upper bound for the Poisson process
-        lambda_t (Float64): rate at the current time
+        tt (Vector{Float64}): remaining frozen time for each coordinate, with dimension `dim`
         ar (Float64): acceptance rate for the thinning
-        error_bound (Int): count of the number of errors in the upper bound
+
+        adaptive (Bool): adaptive indicator
+        accept (Bool): accept indicator for the thinning
+        stick_or_thaw_event (Bool): indicator for the sticking or thawing event
+        
+        errored_bound (Int): count of the number of errors in the upper bound
         rejected (Int): count of the number of rejections in the thinning
         hitting_horizon (Int): count of the number of hits of the horizon
-        adaptive (Bool): adaptive indicator
+        
+        key (Any): random key
 """
 mutable struct PDMPState <: Any
     x::Array{Float64}
     v::Array{Float64}
     t::Float64
+    is_active::Array{Bool}
     horizon::Float64
     key::AbstractRNG
-    integrator::Function
+    flow::Function
     ∇U::Function
     rate::Function
     velocity_jump::Function
     upper_bound_func::Function
     accept::Bool
     upper_bound::Union{Nothing, BoundBox}
-    indicator::Bool
     tp::Float64  # time proposed
     ts::Float64  # time spent
-    exp_rv::Float64
-    lambda_bar::Float64
+    tt::Float64  # time proposed to thaw one coordinate
+    # They are used in `SamplingLoop.jl` to conduct poisson thinning, where `tp` is the proposed jump time, and is added to `ts` when rejected.
+    exp_rv::Float64  # to store an exponential random variable
+    lambda_bar::Float64  # upper bound for the rate function, calculated from `BoundBox`
     lambda_t::Float64
     ar::Float64  # acceptance rate
-    error_bound::Int  # 代理上界で足りなかった回数
+    errored_bound::Int  # 代理上界で足りなかった回数
     error_value_ar::Vector{Float64}  #? jax の実装に引っ張られすぎ？
     rejected::Int
     hitting_horizon::Int  # the total times of hitting the horizon
     adaptive::Bool
+    stick_or_thaw_event::Bool  # indicator for the sticking or thawing event
 end
 
-function PDMPState(x::Vector{Float64}, v::Vector{Float64}, t::Float64, horizon::Float64, key::AbstractRNG, integrator::Function, ∇U::Function, rate::Function, velocity_jump::Function, upper_bound_func::Function, upper_bound::Union{Nothing, BoundBox}, adaptive::Bool)
+function PDMPState(x::Vector{Float64}, v::Vector{Float64}, t::Float64, horizon::Float64, key::AbstractRNG,
+    flow::Function, ∇U::Function, rate::Function, velocity_jump::Function, upper_bound_func::Function,
+    upper_bound::Union{Nothing, BoundBox}, adaptive::Bool)
+    is_active = fill(true, length(x))
     accept = false
-    indicator = false
     tp = 0.0
     ts = 0.0
+    tt = Inf
     exp_rv = 0.0
     lambda_bar = 0.0
     lambda_t = 0.0
     ar = 0.0
-    error_bound = 0
+    errored_bound = 0
     error_value_ar = zeros(5)
     rejected = 0
     hitting_horizon = 0
-    return PDMPState(x, v, t, horizon, key, integrator, ∇U, rate, velocity_jump, upper_bound_func, accept, upper_bound, indicator, tp, ts, exp_rv, lambda_bar, lambda_t, ar, error_bound, error_value_ar, rejected, hitting_horizon, adaptive)
+    stick_or_thaw_event = false
+    return PDMPState(x, v, t, is_active, horizon, key, flow, ∇U, rate, velocity_jump, upper_bound_func, accept, upper_bound, tp, ts, tt, exp_rv, lambda_bar, lambda_t, ar, errored_bound, error_value_ar, rejected, hitting_horizon, adaptive, stick_or_thaw_event)
 end
+
+
 
 
 # """
@@ -102,7 +119,7 @@ end
 #         x (Array{Float64, 1}): The state trajectory.
 #         v (Array{Float64, 1}): The velocity trajectory.
 #         t (Array{Float64, 1}): The time points at which the state and velocity are recorded.
-#         error_bound (Array{Int64, 1}): The error bound at each time point.
+#         errored_bound (Array{Int64, 1}): The error bound at each time point.
 #         error_value_ar (Array{Float64, 1}): The error values at each time point.
 #         rejected (Array{Int64, 1}): The indicator of whether a jump was rejected at each time point.
 #         hitting_horizon (Array{Int64, 1}): The indicator of whether the process hit the horizon at each time point.
@@ -116,7 +133,7 @@ end
     
 #     horizon::Float64
 #     ar::Float64
-#     error_bound::Float64
+#     errored_bound::Float64
 #     error_value_ar::Float64
 #     rejected::Float64
 #     hitting_horizon::Float64
@@ -144,7 +161,7 @@ mutable struct PDMPHistory <: Any
 
     horizon::Vector{Float64}
     ar::Vector{Float64}
-    error_bound::Vector{Int}
+    errored_bound::Vector{Int}
     error_value_ar::Vector{Vector{Float64}}
     rejected::Vector{Int}
     hitting_horizon::Vector{Int}

@@ -15,27 +15,25 @@ using Optim
     Returns:
     - Tuple: A tuple containing the grid, box_max, cum_sum, and interval length.
 """
-function upper_bound_constant(func::Function, a::Union{Float64,Int}, b::Union{Float64,Int}, refresh_rate::Float64=0.0)
-    a, b = Float64(a), Float64(b)
+function upper_bound_constant(func::Function, start::Union{Float64,Int}, horizon::Union{Float64,Int}, refresh_rate::Float64=0.0)::BoundBox
+    start, horizon = Float64(start), Float64(horizon)
     # Define the function to minimize
     func_min = x -> -func(x)
     
     # Use Brent's method to find the minimum
-    result = optimize(func_min, a, b, Brent())
+    result = optimize(func_min, start, horizon, Brent())
     
     # Create the grid and calculate box_max
-    t = collect(LinRange(a, b, 2))  # collect() into Vector{Float64}
+    t = collect(LinRange(start, horizon, 2))  # collect() into Vector{Float64}
     box_max = [-Optim.minimum(result)]  #? Optim.minimum の型はわからないよな？ → func は rate の partial であり，非負値である．
     box_max[1] += refresh_rate
     
     # Calculate cumulative sum
     cum_sum = zeros(2)
-    cum_sum[2] = box_max[1] * (b - a)
+    cum_sum[2] = box_max[1] * (horizon - start)
     
-    return BoundBox(t, box_max, cum_sum, b - a)
+    return BoundBox(t, box_max, cum_sum, horizon - start)
 end
-
-## TODO: Implement upper_bound_grid and upper_bound_grid_vect functions
 
 using ForwardDiff
 
@@ -68,8 +66,39 @@ function upper_bound_grid(func::Function, start::Float64, horizon::Float64, n_gr
     
     intersection_pos = (values[1:end-1] .- values[2:end] .+ (grads[2:end] .* step_size)) ./ (grads[2:end] .- grads[1:end-1])
     intersection_pos = replace(intersection_pos, NaN => 0.0)
-    intersection_pos = clamp.(intersection_pos, 0.0, step_size)
+    intersection_pos = clamp.(intersection_pos, 0.0, step_size)  # clamp(x,a,b) = min(max(x,a),b)
     
+    intersection = values[1:end-1] .+ grads[1:end-1] .* intersection_pos
+    box_max = max.(values[1:end-1], values[2:end])
+    box_max = max.(box_max, intersection)
+    box_max = max.(box_max, 0.0)
+    box_max .+= refresh_rate
+    
+    cum_sum = zeros(Float64, n_grid)
+    cum_sum[2:end] = cumsum(box_max) .* step_size
+    
+    return BoundBox(collect(t), box_max, cum_sum, step_size)
+end
+
+function upper_bound_grid_test(func::Function, start::Float64, horizon::Float64, n_grid::Int=100, refresh_rate::Float64 = 0.0; AD_backend::String="ForwardDiff")::BoundBox
+    # grid の生成
+    t = range(start, stop=horizon, length=n_grid)
+    step_size = t[2] - t[1]  # jax と最後の桁の数値が違う
+    
+    ## grid 上での値と微分係数の計算
+    values = map(func, t)  # その結果後ろの方では結構数値誤差が蓄積している可能性があるが，jax と Julia のどっちがより正しいかは不明．
+    if AD_backend == "ForwardDiff"
+        grads = [ForwardDiff.derivative(func, x) for x in t]
+    elseif AD_backend == "Zygote"
+        grads = [Zygote.gradient(func, x)[1][1] for x in t]
+    end
+    
+    ## compute the intersection position of two tangents on the two edges of the interval
+    intersection_pos = (values[1:end-1] .- values[2:end] .+ (grads[2:end] .* t[2:end]) .+ (grads[1:end-1] .* t[1:end-1])) ./ (grads[2:end] .- grads[1:end-1])
+    intersection_pos = replace(intersection_pos, NaN => 0.0)
+    intersection_pos = clamp.(intersection_pos, 0.0, step_size)  # clamp(x,a,b) = min(max(x,a),b)
+    
+    ## box_max is determined as the maximum of the three values: the values of the function at the left & right edges, and at the intersection point.
     intersection = values[1:end-1] .+ grads[1:end-1] .* intersection_pos
     box_max = max.(values[1:end-1], values[2:end])
     box_max = max.(box_max, intersection)
@@ -99,7 +128,7 @@ using LinearAlgebra
     Returns:
         BoundBox: An object containing the upper bound constant information.
 """
-function upper_bound_grid_vect(func::Function, start::Float64, horizon::Float64, n_grid::Int=100; AD_backend::String="ForwardDiff")::BoundBox
+function upper_bound_grid_vect(func, start::Float64, horizon::Float64, n_grid::Int=100; AD_backend::String="ForwardDiff")::BoundBox
     t = range(start, stop=horizon, length=n_grid)
     step_size = t[2] - t[1]
     
@@ -109,9 +138,15 @@ function upper_bound_grid_vect(func::Function, start::Float64, horizon::Float64,
         grads = hcat([ForwardDiff.derivative(func, x) for x in t]...)
     elseif AD_backend == "Zygote"
         grads = hcat([Zygote.jacobian(func, x)[1] for x in t]...)
+    elseif AD_backend == "PolyesterForwardDiff"
+        grads = hcat([threaded_gradient(func, [x], ForwardDiff.Chunk(8)) for x in t]...)
     end
     
-    intersection_pos = (values[:,1:end-1] .- values[:,2:end] .+ (grads[:,2:end] .* step_size)) ./ (grads[:,2:end] .- grads[:,1:end-1])
+    intersection_pos = (values[:,1:end-1] .- values[:,2:end] .+ (grads[:,2:end] .* t[2:end]') .- (grads[:,1:end-1] .* t[1:end-1]')) ./ (grads[:,2:end] .- grads[:,1:end-1])
+    # This line performs the exact operation as discussed in the Section 4.2 of the paper by Andral & Kamatani (2024).
+    # `grads[:,2:end] .* t[2:end]` gives you (99,99) matrix, instead of (1,99). Transposing as in `t[2:end]'` is needed.
+    # The following is the old line of code:
+    # intersection_pos = (values[:,1:end-1] .- values[:,2:end] .+ (grads[:,2:end] .* step_size)) ./ (grads[:,2:end] .- grads[:,1:end-1])
     intersection_pos = replace(intersection_pos, NaN => 0.0)
     intersection_pos = clamp.(intersection_pos, 0.0, step_size)
     
@@ -142,6 +177,7 @@ end
 """
 function next_event(boundbox::BoundBox, exp_rv::Float64)
     index = searchsortedfirst(boundbox.cum_sum, exp_rv)
+    # if exp_rv exceeds the cum_sum[end], it returns `length(boundbox.cum_sum) + 1`
 
     # if the index is the last element, meaning that exp_rv > cum_sum[end], it returns infinity
     t_prop = index > length(boundbox.cum_sum) ? Inf : boundbox.grid[index-1] + (exp_rv - boundbox.cum_sum[index-1]) / (boundbox.cum_sum[index] - boundbox.cum_sum[index-1]) * boundbox.step_size

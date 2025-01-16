@@ -83,7 +83,7 @@ function sample_skeleton(
     history = PDMPHistory(state)  # initialize history
     
     for _ in iter
-        state = one_step(state)  # go to SamplingLoop.jl
+        state = get_event_state(state, sampler)  # go to SamplingLoop.jl or StickySamplingLoop.jl
         push!(history, state)
     end
     sampler.state = state
@@ -91,6 +91,9 @@ function sample_skeleton(
     return history
 end
 
+"""
+    failsafe dispatch of sample_skeleton(), admitting scalar initial values, used mainly for 1d case.
+"""
 function sample_skeleton(
     sampler::AbstractPDMP,
     n_sk::Int,
@@ -105,8 +108,6 @@ function sample_skeleton(
     return sample_skeleton(sampler, n_sk, xinit, vinit, seed=seed, verbose=verbose)
 
 end
-    
-
 
 """
     スケルトンからサンプリングをし，各行ベクトルに次元毎の時系列が格納された Matrix{Float64} を返す．
@@ -120,9 +121,8 @@ end
     """
 function sample_from_skeleton(sampler::AbstractPDMP, N::Int, history::PDMPHistory)::Matrix{Float64}
     x, v, t = history.x, history.v, history.t
-    t = t .- t[1]  #? これ必要あるか？
     tm = (t[end] / N) .* collect(1:N)  # 等間隔の時点列を生成
     indeces = searchsortedfirst.(Ref(t), tm) .- 1  # 直前の index 番号を取得
-    samples = map(tuple -> sampler.integrator(x[tuple[1]], v[tuple[1]], tm[tuple[2]] - t[tuple[1]])[1], zip(indeces, 1:N))  # integrator を通じて位置を取得
+    samples = map(tuple -> sampler.flow(x[tuple[1]], v[tuple[1]], tm[tuple[2]] - t[tuple[1]])[1], zip(indeces, 1:N))  # flow を通じて位置を取得
     return hcat(samples...)
 end

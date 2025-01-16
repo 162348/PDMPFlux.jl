@@ -15,73 +15,91 @@ function diagnostic(history::PDMPHistory; color="#78C2AD", background="#FFF", li
     display(combined_plot)
 
     # Print the number of error bounds
-    println("number of error bound: ", sum(history.error_bound))
+    println("number of error bound: ", sum(history.errored_bound))
 
     return combined_plot
 end
 
 using LaTeXStrings
 
-function plot_traj(history::PDMPHistory, T_max::Int; plot_type="2D", color="#78C2AD", background="#FFF", linewidth=2)
-    T_max = min(T_max, length(history.t))  # avoids BoundsError
+function plot_traj(history::PDMPHistory, N_max::Int; plot_type="2D", color="#78C2AD", background="#FFF", linewidth=2, filename::Union{String, Nothing}=nothing)
+    N_max = min(N_max, length(history.t))  # avoids BoundsError
     traj = hcat(history.x...)
     if traj.size[1] == 1
-        return Plots.plot(1:T_max, traj[1,1:T_max], xlabel = L"t", ylabel = L"x", title = "Trajectory (up to $T_max events)", label=false, color=color, background=background, linewidth=linewidth)
+        p = Plots.plot(1:N_max, traj[1,1:N_max], xlabel = L"t", ylabel = L"x", title = "Trajectory (up to $N_max events)", label=false, color=color, background=background, linewidth=linewidth)
     elseif plot_type == "2D"
-        return Plots.plot(traj[1,1:T_max], traj[2,1:T_max], xlabel = L"x_1", ylabel = L"x_2", title = "Trajectory (up to $T_max events)", label=false, color=color, background=background, linewidth=linewidth)
+        p = Plots.plot(traj[1,1:N_max], traj[2,1:N_max], xlabel = L"x_1", ylabel = L"x_2", title = "Trajectory (up to $N_max events)", label=false, color=color, background=background, linewidth=linewidth)
     else
-        return Plots.plot(traj[1,1:T_max], traj[2,1:T_max], traj[3,1:T_max], xlabel = L"x_1", ylabel = L"x_2", zlabel = L"x_3", title = "Trajectory (up to $T_max events)", label=false, color=color, background=background, linewidth=linewidth)
+        p = Plots.plot(traj[1,1:N_max], traj[2,1:N_max], traj[3,1:N_max], xlabel = L"x_1", ylabel = L"x_2", zlabel = L"x_3", title = "Trajectory (up to $N_max events)", label=false, color=color, background=background, linewidth=linewidth)
     end
+
+    if !isnothing(filename)
+        filename = isnothing(filename) ? "PDMPFlux_Trajectory.png" : filename
+        filename = endswith(filename, ".png") ? filename : filename * ".png"
+        savefig(p, filename)
+    end
+
+    return p
 end
 
 using ProgressBars
 
-function anim_traj(history::PDMPHistory, T_max::Int; T_start::Int=1, plot_start::Int=1, filename::Union{String, Nothing}=nothing, plot_type="2D", color="#78C2AD", background="#FFF", coordinate_numbers=[1,2,3], dt::Float64=0.1, verbose::Bool=true, fps::Int=60, frame_upper_limit::Int=10000, linewidth=2, dynamic_range::Bool=false)
-    T_max = min(T_max, length(history.t))  # avoids BoundsError
-    trajectory = hcat(history.x...)
+function anim_traj(history::PDMPHistory, N_max::Int; N_start::Int=1, plot_start::Int=1,
+    filename::Union{String, Nothing}=nothing, plot_type="2D", color="#78C2AD", background="#FFF",
+    coordinate_numbers=[1,2,3], dt::Float64=0.1, verbose::Bool=true,
+    fps::Int=60, frame_upper_limit::Int=10000, linewidth=2, dynamic_range::Bool=false,
+    title::Union{String, LaTeXString}="Trajectory (from $N_start to $N_max events)",
+    nonlinear_flow::Union{Function, Nothing}=nothing)
 
-    if trajectory.size[1] == 1
-        traj, event_time = traj_for_animation(trajectory, T_start, T_max; coordinate_numbers=coordinate_numbers[1], dt=dt)
+    N_max = min(N_max, length(history.t), frame_upper_limit)  # avoids BoundsError
+    time_stamps = history.t[N_start:N_max]
+
+    if length(history.x[1]) == 1  # if dim = 1, horizontal axis is time
+        traj, event_indeces, times = traj_for_animation(history, time_stamps, N_start, N_max; coordinate_numbers=coordinate_numbers[1], dt=dt, nonlinear_flow=nonlinear_flow)
         args = (
-            xlims=(0, min(traj.size[2], frame_upper_limit)),
+            xlims=(0, times[min(end, frame_upper_limit)]),
             ylims=(floor(minimum(traj[1,plot_start:end]),digits=1), ceil(maximum(traj[1,plot_start:end]),digits=1)),
             xlabel=L"t",
             ylabel=L"x",
             label=false,
-            title="Trajectory (from $T_start to $T_max events)",
+            title=title,
             color=color,
             background=background,
             linewidth=linewidth
             )
         args = dynamic_range ? (; args..., xlims=nothing, ylims=nothing) : args
         traj = traj[1,:]  # Vector に変換しないと @animate に掛かる時間が 10 倍くらいになる
-        times = collect(Float64, 1:length(traj))  # なぜか Float64 にしないと @animate 内の push! エラー oundsError: attempt to access 2-element Vector{Plots.Series} at index [3] が出る
+        # times = collect(Float64, 1:length(traj))  # なぜか Float64 にしないと @animate 内の push! エラー oundsError: attempt to access 2-element Vector{Plots.Series} at index [3] が出る
 
+        # maximum number of events to be plotted
         upper_limit = min(length(traj), frame_upper_limit)
-        if plot_start > upper_limit
-            @warn "plot_start: $plot_start, upper_limit: $upper_limit"
-            plot_start = upper_limit - 100
+        plot_start_frame = event_indeces[plot_start]
+        if plot_start_frame > upper_limit
+            @warn "plot_start_frame: $plot_start_frame > upper_limit: $upper_limit"
+            plot_start_frame = upper_limit - 100
         end
-        iter = verbose ? ProgressBar(plot_start:upper_limit, unit="B", unit_scale=true) : plot_start:upper_limit
-        p = plot(times[1:plot_start], traj[1:plot_start]; args...)
-        scatter!(p, [times[intersect(1:plot_start, event_time)]], traj[intersect(1:plot_start, event_time)], marker=:circle, markersize=3, markeralpha=0.6, color="#E95420", label=false)
+        # initialize plot
+        p = plot(times[1:plot_start_frame], traj[1:plot_start_frame]; args...)
+        scatter!(p, [times[intersect(1:plot_start_frame, event_indeces)]], traj[intersect(1:plot_start_frame, event_indeces)],
+        marker=:circle, markersize=3, markeralpha=0.6, color="#E95420", label=false)
+        iter = verbose ? ProgressBar(plot_start_frame:upper_limit, unit="B", unit_scale=true) : plot_start_frame:upper_limit
 
         anim = @animate for i ∈ iter
             Base.push!(p, times[i], traj[i])
-            if i ∈ event_time
+            if i ∈ event_indeces
                 scatter!(p, [times[i]], traj[i:i], marker=:circle, markersize=3, markeralpha=0.6, color="#E95420", label=false)
             end
         end
 
-    elseif plot_type == "2D"
-        traj, event_time = traj_for_animation(trajectory, T_start, T_max; coordinate_numbers=coordinate_numbers[1:2], dt=dt)
+    elseif plot_type == "2D"  # if dim > 1 & 2D plot is 
+        traj, event_indeces, _times = traj_for_animation(history, time_stamps, N_start, N_max; coordinate_numbers=coordinate_numbers[1:2], dt=dt, nonlinear_flow=nonlinear_flow)
         args = (
             xlims=(floor(minimum(traj[1,plot_start:end]),digits=1), ceil(maximum(traj[1,plot_start:end]),digits=1)),
             ylims=(floor(minimum(traj[2,plot_start:end]),digits=1), ceil(maximum(traj[2,plot_start:end]),digits=1)),
             xlabel=L"x_1",
             ylabel=L"x_2",
             label=false,
-            title="Trajectory (from $T_start to $T_max events)",
+            title=title,
             color=color,
             background=background,
             linewidth=linewidth
@@ -91,22 +109,23 @@ function anim_traj(history::PDMPHistory, T_max::Int; T_start::Int=1, plot_start:
         traj_y = traj[2,:]
 
         upper_limit = min(length(traj_x), frame_upper_limit)
-        if plot_start > upper_limit
-            @warn "plot_start: $plot_start, upper_limit: $upper_limit"
-            plot_start = upper_limit - 100
+        plot_start_frame = event_indeces[plot_start]
+        if plot_start_frame > upper_limit
+            @warn "plot_start_frame: $plot_start_frame > upper_limit: $upper_limit"
+            plot_start_frame = upper_limit - 100
         end
-        iter = verbose ? ProgressBar(plot_start:upper_limit, unit="B", unit_scale=true) : plot_start:upper_limit
-        p = plot(traj_x[1:plot_start], traj_y[1:plot_start]; args...)
-        scatter!(p, [traj_x[intersect(1:plot_start, event_time)]], traj_y[intersect(1:plot_start, event_time)], marker=:circle, markersize=3, markeralpha=0.6, color="#E95420", label=false)
+        p = plot(traj_x[1:plot_start_frame], traj_y[1:plot_start_frame]; args...)
+        scatter!(p, [traj_x[intersect(1:plot_start_frame, event_indeces)]], traj_y[intersect(1:plot_start_frame, event_indeces)], marker=:circle, markersize=3, markeralpha=0.6, color="#E95420", label=false)
+        iter = verbose ? ProgressBar(plot_start_frame:upper_limit, unit="B", unit_scale=true) : plot_start_frame:upper_limit
 
         anim = @animate for i ∈ iter
             Base.push!(p, traj_x[i], traj_y[i])
-            if i ∈ event_time
+            if i ∈ event_indeces
                 scatter!(p, traj_x[i:i], traj_y[i:i], marker=:circle, markersize=3, markeralpha=0.6, color="#E95420", label=false)
             end
         end
-    else
-        traj, event_time = traj_for_animation(trajectory, T_start, T_max; coordinate_numbers=coordinate_numbers[1:3], dt=dt)
+    else  # if dim > 1 & 3D plot is requested
+        traj, event_indeces, _times = traj_for_animation(history, time_stamps, N_start, N_max; coordinate_numbers=coordinate_numbers[1:3], dt=dt, nonlinear_flow=nonlinear_flow)
         args = (
             xlims=(floor(minimum(traj[1,plot_start:end]),digits=1), ceil(maximum(traj[1,plot_start:end]),digits=1)),
             ylims=(floor(minimum(traj[2,plot_start:end]),digits=1), ceil(maximum(traj[2,plot_start:end]),digits=1)),
@@ -115,7 +134,7 @@ function anim_traj(history::PDMPHistory, T_max::Int; T_start::Int=1, plot_start:
             ylabel=L"x_2",
             zlabel=L"x_3",
             label=false,
-            title="Trajectory (up to $T_max events)",
+            title=title,
             color=color,
             background=background,
             linewidth=linewidth
@@ -126,52 +145,95 @@ function anim_traj(history::PDMPHistory, T_max::Int; T_start::Int=1, plot_start:
         traj_z = traj[3,:]
 
         upper_limit = min(length(traj_x), frame_upper_limit)
-        if plot_start > upper_limit
-            @warn "plot_start: $plot_start, upper_limit: $upper_limit"
-            plot_start = upper_limit - 100
+        plot_start_frame = event_indeces[plot_start]
+        if plot_start_frame > upper_limit
+            @warn "plot_start_frame: $plot_start_frame > upper_limit: $upper_limit"
+            plot_start_frame = upper_limit - 100
         end
-        iter = verbose ? ProgressBar(plot_start:upper_limit, unit="B", unit_scale=true) : plot_start:upper_limit
-        p = plot(traj_x[1:plot_start], traj_y[1:plot_start], traj_z[1:plot_start]; args...)
-        scatter!(p, [traj_x[intersect(1:plot_start, event_time)]], traj_y[intersect(1:plot_start, event_time)], traj_z[intersect(1:plot_start, event_time)], marker=:circle, markersize=3, markeralpha=0.6, color="#E95420", label=false)
+        # initialize plot
+        p = plot(traj_x[1:plot_start_frame], traj_y[1:plot_start_frame], traj_z[1:plot_start_frame]; args...)
+        scatter!(p, [traj_x[intersect(1:plot_start_frame, event_indeces)]], traj_y[intersect(1:plot_start_frame, event_indeces)], traj_z[intersect(1:plot_start_frame, event_indeces)], marker=:circle, markersize=3, markeralpha=0.6, color="#E95420", label=false)
+        iter = verbose ? ProgressBar(plot_start_frame:upper_limit, unit="B", unit_scale=true) : plot_start_frame:upper_limit
+
         anim = @animate for i ∈ iter
             Base.push!(p, traj_x[i], traj_y[i], traj_z[i])
-            if i ∈ event_time
+            if i ∈ event_indeces
                 scatter!(p, traj_x[i:i], traj_y[i:i], traj_z[i:i], marker=:circle, markersize=3, markeralpha=0.6, color="#E95420", label=false)
             end
         end
     end
 
-    filename = isnothing(filename) ? "PDMPFlux_Animation.gif" : filename
-    filename = endswith(filename, ".gif") ? filename : filename * ".gif"
-    gif(anim, filename, fps=fps)
+    if !isnothing(filename)
+        filename = isnothing(filename) ? "PDMPFlux_Animation.gif" : filename
+        filename = endswith(filename, ".gif") ? filename : filename * ".gif"
+        gif(anim, filename, fps=fps)
+    end
 
     return anim
 end
 
-function traj_for_animation(trajectory::Matrix{Float64}, T_start::Int, T_max::Int; coordinate_numbers=[1,2,3], dt::Float64=0.01)
-    traj = trajectory[coordinate_numbers, T_start:T_max]
+"""
+    traj_for_animation(): アニメーション用の軌道を抽出する．
+
+    Parameters:
+    - trajectory (Matrix{Float64}): The trajectory to be animated.
+    - N_start (Int): The starting index of the trajectory.
+    - N_max (Int): The ending index of the trajectory.
+    - coordinate_numbers (Array{Int, 1}): The indices of the coordinates to be plotted.
+    - dt (Float64): The time step for the animation.
+
+    Returns:
+    - traj: The snapshots of the trajectory to be animated.
+    - event_indeces: The indices of traj, where the events occur.
+"""
+function traj_for_animation(history::PDMPHistory, time_stamps::Vector{Float64}, N_start::Int, N_max::Int;
+    coordinate_numbers=[1,2,3], dt::Float64=0.1, nonlinear_flow::Union{Function, Nothing}=nothing)
+
+    trajectory = hcat(history.x...)
+    traj = trajectory[coordinate_numbers, N_start:N_max]
     traj = isa(traj, Vector) ? reshape(traj, 1, :) : traj
-    x = []
-    event_time = []
-    for (point, n) in zip(eachcol(traj),1:T_max-T_start+1)
+    v_history = hcat(history.v...)[coordinate_numbers, N_start:N_max]  # not used if nonlinear_flow = nothing
+    x, event_indeces, t = [], [], []
+
+    for (xₙ, tₙ, n) in zip(eachcol(traj), time_stamps, 1:N_max-N_start+1)
         if n == 1  # initialize
-            Base.push!(x, point)
-            Base.push!(event_time, length(x))
-        elseif n != T_max - T_start + 1
-            displacement = traj[:,n+1] .- point
-            distance = sqrt(sum(displacement.^2))
-            step_number = round(Int, distance/dt)
+            Base.push!(x, xₙ)
+            Base.push!(t, tₙ)
+            Base.push!(event_indeces, length(x))  # event_indeces[1] = 1
+        elseif isnothing(nonlinear_flow)
+            time_passed = tₙ - time_stamps[n-1]
+            step_number = round(Int, time_passed/dt)
             if step_number > 0
-                step = displacement ./ step_number
+                one_step = (xₙ .- traj[:,n-1]) ./ step_number
+                one_step_time = time_passed ./ step_number
                 for i in 1:step_number
-                    Base.push!(x, point + step .* i)
+                    Base.push!(x, traj[:,n-1] + one_step .* i)
+                    Base.push!(t, time_stamps[n-1] + one_step_time * i)
                 end
-                Base.push!(event_time, length(x))
-            else
-                Base.push!(x, traj[:,n+1])
-                Base.push!(event_time, length(x))
+                Base.push!(event_indeces, length(x))
+            else  # step_number == 0
+                Base.push!(x, traj[:,n])
+                Base.push!(t, time_stamps[n])
+                Base.push!(event_indeces, length(x))
+            end
+        else
+            time_passed = tₙ - time_stamps[n-1]
+            step_number = round(Int, time_passed/dt)
+            if step_number > 0
+                one_step = (xₙ .- traj[:,n-1]) ./ step_number
+                one_step_time = time_passed ./ step_number
+                for i in 1:step_number
+                    Base.push!(x, nonlinear_flow(traj[:,n-1], v_history[:,n-1], one_step_time * i)[1])
+                    Base.push!(t, time_stamps[n-1] + one_step_time * i)
+                end
+                Base.push!(event_indeces, length(x))
+            else  # step_number == 0
+                Base.push!(x, traj[:,n])
+                Base.push!(t, time_stamps[n])
+                Base.push!(event_indeces, length(x))
             end
         end
     end
-    return hcat(x...), event_time
+    return hcat(x...), event_indeces, t
 end
+

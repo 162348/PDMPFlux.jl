@@ -17,7 +17,7 @@ abstract type AbstractPDMP end
         adaptive::Bool: 適応的なtmaxを使用するかどうか。
         vectorized_bound::Bool: ベクトル化された戦略を使用するかどうか。
         signed_bound::Bool: 符号付き戦略を使用するかどうか。
-        integrator::Function: インテグレータ関数。
+        flow::Function: インテグレータ関数。
         rate::Array: プロセスのレート。
         rate_vect::Array: ベクトル化されたレート。
         signed_rate::Array: 符号付きレート。
@@ -42,7 +42,7 @@ abstract type AbstractPDMP end
 #     signed_bound::Bool
 #     adaptive::Bool
 
-#     integrator::Function
+#     flow::Function
 #     rate::Function
 #     velocity_jump::Function
 #     state::Union{PDMPState, Nothing}
@@ -63,7 +63,7 @@ abstract type AbstractPDMP end
         constant_bound (bool, optional): Whether to use constant upper bound. Defaults to False.
 
     Returns:
-        PdmpState: The initialized PDMP state.
+        PDMPState: The initialized PDMP state.
 """
 function init_state(pdmp::AbstractPDMP, xinit::Array{Float64}, vinit::Array{Float64}, seed::Int)
 
@@ -103,6 +103,8 @@ function init_state(pdmp::AbstractPDMP, xinit::Array{Float64}, vinit::Array{Floa
         end
     end
 
+    
+
     boundox = upper_bound_func(xinit, vinit, pdmp.tmax)
     state = PDMPState(
         xinit,
@@ -110,7 +112,7 @@ function init_state(pdmp::AbstractPDMP, xinit::Array{Float64}, vinit::Array{Floa
         0.0,
         pdmp.tmax,
         key,
-        pdmp.integrator,
+        pdmp.flow,
         pdmp.∇U,
         pdmp.rate,
         pdmp.velocity_jump,
