@@ -173,7 +173,7 @@ end
 
 function PDMPHistory(init_state::PDMPState)::PDMPHistory
     keys = fieldnames(PDMPHistory)
-    values = [[getfield(init_state, key)] for key in keys]
+    values = [[deepcopy(getfield(init_state, key))] for key in keys]
     return PDMPHistory(values...)
 end
 
@@ -190,7 +190,7 @@ end
 function push!(history::PDMPHistory, state::PDMPState)::PDMPHistory
     keys = fieldnames(PDMPHistory)
     for key in keys
-        Base.push!(getfield(history, key), getfield(state, key))  # なぜか Base. が必要．
+        Base.push!(getfield(history, key), copy(getfield(state, key)))  # なぜか Base. が必要．
     end
     return history
 end
