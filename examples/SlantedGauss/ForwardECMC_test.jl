@@ -1,7 +1,7 @@
 using PDMPFlux
 
 function U_Gauss(x::Vector)
-    return (sum(x.^2) - x[1]*x[2]) / 2
+    return (sum(x.^2)) / 2
 end
 
 function U_Banana(x::Vector)
@@ -13,7 +13,7 @@ dim = 3
 sampler = ForwardECMCAD(dim, U_Gauss, grid_size=10)
 # sampler = ZigZagAD(dim, U_Gauss, grid_size=10, signed_bound=false)
 
-N_sk, N, xinit, vinit = 100, 100, ones(dim), [1.2,-3.4, 5.6]
+N_sk, N, xinit, vinit = 100, 100, zeros(dim), ones(dim)
 
 output = sample_skeleton(sampler, N_sk, xinit, vinit, seed=2024)
 samples = sample_from_skeleton(sampler, N, output)
@@ -21,7 +21,7 @@ samples = sample_from_skeleton(sampler, N, output)
 # diagnostic(output)
 jointplot(samples)
 
-anim_traj(output, 100; filename="ForwardECMC_SlantedGauss2D.gif", title="Forward ECMC Sampler")
+anim_traj(output, 20; filename="ForwardECMC_StandardGauss3D.gif", title="Forward ECMC Sampler on 3D Standard Gaussian", plot_type="3D")
 
 function animate(filename::String; title::String, dim::Int=3, N_sk::Int=100, N::Int=100,
   xinit::Vector{Float64}=ones(dim), vinit::Vector{Float64}=ones(dim))
@@ -30,6 +30,10 @@ function animate(filename::String; title::String, dim::Int=3, N_sk::Int=100, N::
   output = sample_skeleton(sampler, N_sk, xinit, vinit, seed=2024)
   anim_traj(output, 100; filename=filename, title=title)
 end
+
+v = hcat(output.v...)
+# check = []
+# histogram(v[1,:])
 
 # animate("ForwardECMC_SlantedGauss2D.gif"; title="Forward ECMC Sampler", dim=2)
 

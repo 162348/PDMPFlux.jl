@@ -55,8 +55,6 @@ function sample(
 
 end
 
-using Debugger
-
 """
     sample_skeleton(): PDMP Samplers からスケルトンを抽出する．
 
@@ -85,7 +83,6 @@ function sample_skeleton(
     history = PDMPHistory(state)  # initialize history
     
     for _ in iter
-        @bp
         state = get_event_state(state, sampler)  # go to SamplingLoop.jl or StickySamplingLoop.jl
         push!(history, state)
     end

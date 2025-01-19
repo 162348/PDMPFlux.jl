@@ -19,8 +19,7 @@ mutable struct ForwardECMC <: AbstractPDMP
   # p::Int  # TODO: Number of components to be refreshed each time
 
   function ForwardECMC(dim::Int, ∇U::Function; grid_size::Int=10, tmax::Union{Float64, Int}=2.0,
-    signed_bound::Bool=true,
-    adaptive::Bool=true, ran_p::Bool=true, mix_p::Float64=0.5)
+    signed_bound::Bool=true, adaptive::Bool=true, ran_p::Bool=true, mix_p::Float64=0.5)
 
     tmax = Float64(tmax)
     # select tmax adaptively if tmax was 0
@@ -53,28 +52,32 @@ mutable struct ForwardECMC <: AbstractPDMP
     n = norm(∇U(x)) == 0 ? zeros(dim) : ∇U(x) ./ norm(∇U(x))
     vₚ = (v ⋅ n) * n  # Parallel component of v along n (normalized ∇U(x))
     vₒ = v - vₚ  # Orthogonal component of v
-  
-    function _refresh_ortho(key, ran_p)
-        g = randn(2, dim)
-        g₁ = g[1, :]
-        g₂ = g[2, :]
-        g₁ = g₁ .- (g₁ ⋅ n) * n
-        g₂ = g₂ .- (g₂ ⋅ n) * n
-        e₁ = g₁ / norm(g₁)
-        e₂ = g₂ - (g₂ ⋅ e₁) * e₁
-        e₂ /= norm(e₂)
-        θ = ran_p ? rand(key) * 2π : π/2
-        vᵣ = vₒ .- (vₒ ⋅ e₁) * e₁ .- (vₒ ⋅ e₂) * e₂
-        vₒ_new = vᵣ .+ (cos(θ) * e₁ + sin(θ) * e₂) * (e₁ ⋅ vₒ) .+ (sin(θ) * e₁ - cos(θ) * e₂) * (e₂ ⋅ vₒ)
-        # vₒ_new /= norm(vₒ_new)  # 零除算が発生する
-        vₒ_new *= sign(vₒ ⋅ vₒ_new)
-        return vₒ_new
+
+    if norm(vₒ) < 1e-10  # Avoid magnifying the error in the later normalization step. See also https://github.com/charlyandral/pdmp_jax/issues/1#issue-2789038461.
+      # If vₒ is (near) zero, return arbitrary Span(∇U(x))^\top vector
+      vₒ = randn(dim)
+      vₒ = vₒ .- (vₒ ⋅ n) * n
+    end
+
+    function _refresh_ortho(vₒ, key, ran_p::Bool)
+      g = randn(2, dim)
+      g₁ = g[1, :]
+      g₂ = g[2, :]
+      g₁ = g₁ .- (g₁ ⋅ n) * n
+      g₂ = g₂ .- (g₂ ⋅ n) * n
+      e₁ = g₁ / norm(g₁)
+      e₂ = g₂ - (g₂ ⋅ e₁) * e₁
+      e₂ /= norm(e₂)
+      θ = ran_p ? rand(key) * 2π : π/2
+      vᵣ = vₒ .- (vₒ ⋅ e₁) * e₁ .- (vₒ ⋅ e₂) * e₂
+      vₒ_new = vᵣ .+ (cos(θ) * e₁ + sin(θ) * e₂) * (e₁ ⋅ vₒ) .+ (sin(θ) * e₁ - cos(θ) * e₂) * (e₂ ⋅ vₒ)
+      vₒ_new *= sign(vₒ ⋅ vₒ_new)  # align with old vₒ to avoid back-tracking movements
+      return vₒ_new
     end
   
     u2 = rand(key)
-    vₒ_proposal = norm(vₒ) == 0 ? zeros(dim) : vₒ / norm(vₒ)
-    vₒ_proposal = u2 < mix_p ? _refresh_ortho(key, ran_p) : vₒ_proposal
-    v_out = vₒ_proposal * sqrt(1 - ρ^2) .+ ρ * n
+    vₒ_proposal = u2 < mix_p ? _refresh_ortho(vₒ, key, ran_p) : vₒ
+    v_out = vₒ_proposal / norm(vₒ_proposal) * sqrt(1 - ρ^2) .+ ρ * n  # renormalize vₒ_proposal to assure |v_out| = 1.
     return v_out
   end
 
