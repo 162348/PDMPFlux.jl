@@ -54,7 +54,7 @@ function anim_traj(history::PDMPHistory, N_max::Int; N_start::Int=1, plot_start:
     N_max = min(N_max, length(history.t), frame_upper_limit)  # avoids BoundsError
     time_stamps = history.t[N_start:N_max]
 
-    if length(history.x[1]) == 1  # if dim = 1, horizontal axis is time
+    if length(history.x[1]) == 1 || plot_type == "1D"  # if dim = 1, horizontal axis is time
         traj, event_indeces, times = traj_for_animation(history, time_stamps, N_start, N_max; coordinate_numbers=coordinate_numbers[1], dt=dt, nonlinear_flow=nonlinear_flow)
         args = (
             xlims=(0, times[min(end, frame_upper_limit)]),

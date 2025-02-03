@@ -15,19 +15,24 @@ end
 
 dim = 2
 sampler = StickyZigZagAD(dim, U_Gauss, [0.1, 1.5], grid_size=10)
-using Debugger
 # sampler = StickyZigZagAD(dim, U_Cauchy, [15.0], grid_size=10)
 
 N_sk, N, xinit, vinit = 10000, 10000, zeros(dim), ones(dim)
 
 output = sample_skeleton(sampler, N_sk, xinit, vinit, seed=2024)
-# samples = sample_from_skeleton(sampler, N, output)
+samples = sample_from_skeleton(sampler, N, output)
+x = hcat(output.x...)
+
+p = plot_traj(output, 100)
+using Plots
+scatter!(p, samples[1, 1:110], samples[2, 1:110], color=:red, label="")
 
 # diagnostic(output)
 # jointplot(samples)
 
 using LaTeXStrings
-anim_traj(output, 100; filename="StickyZigZag_SlantedGauss2D.gif", title="Sticky Zig-Zag Sampler " * L"\kappa = [0.1, 1.5]")
+anim_traj(output, 30, filename="StickyZigZag.gif", title="Sticky Zig-Zag Sampler " * L"\kappa = [0.1, 1.5]", background="#F0F1EB", color="#E95420")
+# anim_traj(output, 30, filename="StickyZigZag_1st.gif", title="Sticky Zig-Zag Sampler " * L"\kappa = [0.1, 1.5]", plot_type="1D", coordinate_numbers=[1])
 # anim_traj(output, 30; plot_start=10, filename="StickyZigZag_Cauchy1D.gif", title="Sticky Zig-Zag Sampler " * L"\kappa = 15")
 
 # ForwardDiff: なぜかサンプルの精度が酷い

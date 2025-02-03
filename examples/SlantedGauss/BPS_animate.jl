@@ -16,7 +16,7 @@ samples = sample_from_skeleton(sampler, N, output)
 # diagnostic(output)
 jointplot(samples)
 
-anim_traj(output, 100; filename="BPS_SlantedGauss2D.gif", title="BPS Sampler")
+anim_traj(output, 40; filename="BPS_SlantedGauss2D.gif", title="Bouncy Particle Sampler", background="#F0F1EB", color="#E95420")
 # anim_traj(output, 100; filename="BPS_SlantedGauss3D.gif", title="BPS Sampler", plot_type="3D")
 
 # ForwardDiff: なぜかサンプルの精度が酷い

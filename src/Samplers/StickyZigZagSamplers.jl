@@ -92,10 +92,10 @@ mutable struct StickyZigZag <: StickyPDMP
         end
 
         # Define velocity jump function
-        function velocity_jump(x, v, rng)
+        function velocity_jump(x, v, key)
             lambda_t = max.(zeros(dim), ∇U(x) .* v)
             p = lambda_t ./ sum(lambda_t)
-            m = rand(rng, Categorical(p))
+            m = rand(key, Categorical(p))
             v[m] *= -1
             return v
         end

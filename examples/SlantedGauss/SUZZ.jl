@@ -16,7 +16,7 @@ samples = sample_from_skeleton(sampler, N, output)
 # diagnostic(output)
 jointplot(samples)
 
-anim_traj(output, 100; filename="SUZZ_SlantedGauss2D.gif", title="Speed Up Zig-Zag Sampler")
+anim_traj(output, 30; filename="SUZZ_SlantedGauss2D.gif", title="Speed Up Zig-Zag Sampler", background="#F0F1EB", color="#E95420")
 
 # ForwardDiff: なぜかサンプルの精度が酷い
 ## grid 10 + vectorized 1:23 / 1.18, Mean 0.94

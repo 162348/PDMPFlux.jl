@@ -158,6 +158,7 @@ mutable struct PDMPHistory <: Any
     x::Vector{Vector{Float64}}
     v::Vector{Vector{Float64}}
     t::Vector{Float64}
+    is_active::Vector{Vector{Bool}}
 
     horizon::Vector{Float64}
     ar::Vector{Float64}

@@ -16,7 +16,7 @@ samples = sample_from_skeleton(sampler, N, output)
 # diagnostic(output)
 jointplot(samples)
 
-anim_traj(output, 30; filename="Boomerang_SlantedGauss2D.gif", title="Boomerang Sampler", nonlinear_flow=sampler.flow)
+anim_traj(output, 20; filename="Boomerang_SlantedGauss2D.gif", title="Boomerang Sampler", nonlinear_flow=sampler.flow)
 # anim_traj(output, 100; filename="BPS_SlantedGauss3D.gif", title="BPS Sampler", plot_type="3D")
 
 # ForwardDiff: なぜかサンプルの精度が酷い

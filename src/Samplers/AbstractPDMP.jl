@@ -65,7 +65,7 @@ abstract type AbstractPDMP end
     Returns:
         PDMPState: The initialized PDMP state.
 """
-function init_state(pdmp::AbstractPDMP, xinit::Array{Float64}, vinit::Array{Float64}, seed::Int)
+function init_state(pdmp::AbstractPDMP, xinit::Array{Float64}, vinit::Array{Float64}, seed::Union{Int, Nothing}=nothing)
 
     # xinit と vinit の次元が pdmp.dim に一致するか確認
     if length(xinit) != pdmp.dim || length(vinit) != pdmp.dim

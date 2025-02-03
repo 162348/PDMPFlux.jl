@@ -21,7 +21,7 @@ samples = sample_from_skeleton(sampler, N, output)
 # diagnostic(output)
 jointplot(samples)
 
-anim_traj(output, 20; filename="ForwardECMC_StandardGauss3D.gif", title="Forward ECMC Sampler on 3D Standard Gaussian", plot_type="3D")
+anim_traj(output, 30; filename="ForwardECMC_StandardGauss2D.gif", title="Forward ECMC Sampler", plot_type="2D", background="#F0F1EB", color="#E95420")
 
 function animate(filename::String; title::String, dim::Int=3, N_sk::Int=100, N::Int=100,
   xinit::Vector{Float64}=ones(dim), vinit::Vector{Float64}=ones(dim))

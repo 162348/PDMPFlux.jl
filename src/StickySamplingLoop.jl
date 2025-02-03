@@ -68,7 +68,7 @@ function move_to_axes_and_stick(state::PDMPState)::PDMPState
     # move to the axis & stick to it
     state.x, v_discard = state.flow(state.x, state.v .* state.is_active, t_togo)
     state.is_active[i] = false  # froze the coordinate
-    state.t += t_togo
+    state.t += t_togo + state.ts
     state.ts = 0.0
 
     state.stick_or_thaw_event = true  # get out of the loop

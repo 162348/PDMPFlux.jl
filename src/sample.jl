@@ -55,6 +55,8 @@ function sample(
 
 end
 
+using Debugger
+
 """
     sample_skeleton(): PDMP Samplers からスケルトンを抽出する．
 
@@ -73,7 +75,7 @@ function sample_skeleton(
     n_sk::Int,
     xinit::Vector{Float64},
     vinit::Vector{Float64};
-    seed::Int=nothing,
+    seed::Union{Int, Nothing}=nothing,
     verbose::Bool=true
 )::PDMPHistory
 
@@ -83,6 +85,7 @@ function sample_skeleton(
     history = PDMPHistory(state)  # initialize history
     
     for _ in iter
+        @bp
         state = get_event_state(state, sampler)  # go to SamplingLoop.jl or StickySamplingLoop.jl
         push!(history, state)
     end
@@ -121,8 +124,8 @@ end
     """
 function sample_from_skeleton(sampler::AbstractPDMP, N::Int, history::PDMPHistory)::Matrix{Float64}
     x, v, t = history.x, history.v, history.t
-    tm = (t[end] / N) .* collect(1:N)  # 等間隔の時点列を生成
-    indeces = searchsortedfirst.(Ref(t), tm) .- 1  # 直前の index 番号を取得
-    samples = map(tuple -> sampler.flow(x[tuple[1]], v[tuple[1]], tm[tuple[2]] - t[tuple[1]])[1], zip(indeces, 1:N))  # flow を通じて位置を取得
+    tm = (t[end] / N) .* collect(1:N)  # equidistant time points
+    indeces = searchsortedfirst.(Ref(t), tm) .- 1  # previous index
+    samples = map(tuple -> sampler.flow(x[tuple[1]], v[tuple[1]] .* history.is_active[tuple[1]], tm[tuple[2]] - t[tuple[1]])[1], zip(indeces, 1:N))  # flow を通じて位置を取得
     return hcat(samples...)
 end
