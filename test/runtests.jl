@@ -4,7 +4,7 @@ function U_Gauss(x::Vector)
     return sum(x.^2) / 2
 end
 
-dim = 10
+dim = 1000
 sampler = ForwardECMCAD(dim, U_Gauss, grid_size=10)
 
 N_sk, N, xinit, vinit = 100_000, 100_000, zeros(dim), ones(dim)
@@ -13,8 +13,11 @@ N_sk, N, xinit, vinit = 100_000, 100_000, zeros(dim), ones(dim)
 output = sample_skeleton(sampler, N_sk, xinit, vinit, seed=2024)
 samples = sample_from_skeleton(sampler, N, output)
 
-diagnostic(output)
-jointplot(samples)
+# diagnostic(output)
+# jointplot(samples)
+
+### 5/20/2025
+# d=1000; 44, 
 
 # ForwardDiff: なぜかサンプルの精度が酷い
 ## grid 10 + vectorized 1:23 / 1.18, Mean 0.94

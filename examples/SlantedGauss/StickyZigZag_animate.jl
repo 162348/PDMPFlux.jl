@@ -19,7 +19,7 @@ sampler = StickyZigZagAD(dim, U_Gauss, [0.1, 1.5], grid_size=10)
 
 N_sk, N, xinit, vinit = 10000, 10000, zeros(dim), ones(dim)
 
-output = sample_skeleton(sampler, N_sk, xinit, vinit, seed=2024)
+output = sample_skeleton(sampler, N_sk, xinit, vinit, seed=2023)
 samples = sample_from_skeleton(sampler, N, output)
 x = hcat(output.x...)
 
@@ -31,7 +31,8 @@ scatter!(p, samples[1, 1:110], samples[2, 1:110], color=:red, label="")
 # jointplot(samples)
 
 using LaTeXStrings
-anim_traj(output, 30, filename="StickyZigZag.gif", title="Sticky Zig-Zag Sampler " * L"\kappa = [0.1, 1.5]", background="#F0F1EB", color="#E95420")
+plot_traj(output, 20, filename="StickyZigZag.svg", background="#F0F1EB", title="Sticky Zig-Zag Sampler " * L"\kappa = [0.1, 1.5]")
+# anim_traj(output, 30, filename="StickyZigZag.gif", title="Sticky Zig-Zag Sampler " * L"\kappa = [0.1, 1.5]", background="#F0F1EB", color="#E95420")
 # anim_traj(output, 30, filename="StickyZigZag_1st.gif", title="Sticky Zig-Zag Sampler " * L"\kappa = [0.1, 1.5]", plot_type="1D", coordinate_numbers=[1])
 # anim_traj(output, 30; plot_start=10, filename="StickyZigZag_Cauchy1D.gif", title="Sticky Zig-Zag Sampler " * L"\kappa = 15")
 

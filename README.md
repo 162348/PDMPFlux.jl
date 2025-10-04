@@ -208,3 +208,13 @@ proposed in [Bierkens et. al. (2023)](https://link.springer.com/article/10.1007/
   * R
     * [`rjpdmp`](https://github.com/matt-sutton/rjpdmp) by [Matthew Sutton](https://github.com/matt-sutton)
     * [`RZigZag`](https://github.com/jbierkens/RZigZag) by [Joris Bierkens](https://github.com/jbierkens)
+
+
+## Changelog
+
+- v0.1.0: Initial release.
+- v0.2.0: ForwardDiff.jl, ReverseDiff.jl are supported as custom backend AD engines.
+- v0.3.0: New 5 samplers are implemented, accompanied by the new abstract type StickyPDMP.
+- v0.4.0: 
+  - Added additional argument `p` to `ForwardECMC` sampler.
+  - Added additional argument `μ` to `BPS` sampler.
