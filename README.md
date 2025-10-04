@@ -1,4 +1,4 @@
-# PDMPFlux developed by Hirofumi Shiba
+# PDMPFlux
 
 | Documentation | Workflows | Code Coverage | Quality Assurance |
 |:-------------:|:---------:|:-------------:|:-----------------:|
