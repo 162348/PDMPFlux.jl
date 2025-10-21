@@ -1,29 +1,44 @@
+using Test
 using PDMPFlux
+using Random
+using Distributions
+using LinearAlgebra
+using Statistics
 
-function U_Gauss(x::Vector)
-    return sum(x.^2) / 2
-end
+# テスト用のシードを設定
+Random.seed!(42)
 
-dim = 1000
-sampler = ForwardECMCAD(dim, U_Gauss, grid_size=10)
+# テスト設定
+const TEST_TIMEOUT = 300  # 5分のタイムアウト
+const QUICK_TEST_SAMPLES = 100
+const STANDARD_TEST_SAMPLES = 500
+const EXTENDED_TEST_SAMPLES = 1000
 
-N_sk, N, xinit, vinit = 100_000, 100_000, zeros(dim), ones(dim)
-# samples = sample(sampler, N_sk, N, xinit, vinit, seed=2024)
+# 基本テスト（必須）
+println("Running basic tests...")
+include("test_utils.jl")
+include("test_samplers.jl")
+include("test_ad_backends.jl")
 
-output = sample_skeleton(sampler, N_sk, xinit, vinit, seed=2024)
-samples = sample_from_skeleton(sampler, N, output)
+# 機能テスト
+println("Running functionality tests...")
+include("test_diagnostics.jl")
+include("test_plotting.jl")
 
-# diagnostic(output)
-# jointplot(samples)
+# 拡張テスト（時間がかかる）
+println("Running extended tests...")
+include("test_comprehensive.jl")
+include("test_error_handling.jl")
+include("test_property_based.jl")
+include("test_integration.jl")
 
-### 5/20/2025
-# d=1000; 44, 
+# 新しいテスト
+println("Running coverage tests...")
+include("test_coverage.jl")
+include("test_stability.jl")
+include("test_performance.jl")
 
-# ForwardDiff: なぜかサンプルの精度が酷い
-## grid 10 + vectorized 1:23 / 1.18, Mean 0.94
-## grid 10 + non-vectorized 1:35, Mean 0.94
-## Brent 5:06, Mean ? → サンプルを 1/10 にして 0:12, Mean 0.87
-## grid 100 + vectorized 6:35, Mean 0.94
+# テストヘルパー（必要に応じて）
+# include("test_helpers.jl")
 
-# Zygote
-## grid 10 + vectorized 0:48, Mean 0.966...
+println("All tests completed successfully!")

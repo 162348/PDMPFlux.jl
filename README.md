@@ -9,6 +9,7 @@
 `PDMPFlux.jl` provides a fast and efficient implementation of **Piecewise Deterministic Markov Process (PDMP)** samplers, using a grid-based Poisson thinning approach proposed in [Andral and Kamatani (2024)](https://arxiv.org/abs/2408.03682).
 
 By the means of the automatic differentiation engines, `PDMPFlux.jl` only requires `dim` and `U`, which is the negative log density of the target distribution (e.g., posterior).
+
 $$
 U(x) = -\log p(x) + \text{const}.
 $$

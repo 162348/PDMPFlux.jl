@@ -3,6 +3,5 @@
 *.jl.mem
 /Manifest.toml
 /docs/Manifest.toml
-/docs/build/
 **/.DS_Store
 papers/
