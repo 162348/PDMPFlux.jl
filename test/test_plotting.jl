@@ -23,7 +23,10 @@
         
         # アニメーション関数がエラーなく実行されることをテスト
         # 実際のアニメーション生成は時間がかかるので、短いバージョンでテスト
-        @test_nowarn anim_traj(output, 10, filename="test_traj.gif")
+        @test begin
+            result = anim_traj(output, 10, filename="test_traj.gif")
+            return result !== nothing && isfile("test_traj.gif")
+        end
         
         # テスト用ファイルを削除
         if isfile("test_traj.gif")
@@ -78,7 +81,10 @@
         @test_nowarn plot_traj(output, 100, plot_type="3D")
         
         # 3Dアニメーションがエラーなく実行されることをテスト
-        @test_nowarn anim_traj(output, 10, plot_type="3D", filename="test_3d.gif")
+        @test begin
+            result = anim_traj(output, 10, plot_type="3D", filename="test_3d.gif")
+            return result !== nothing && isfile("test_3d.gif")
+        end
         
         # テスト用ファイルを削除
         if isfile("test_3d.gif")
@@ -108,7 +114,10 @@
         @test_nowarn plot_traj(output, 100, background="white")
         
         # アニメーションパラメータのテスト
-        @test_nowarn anim_traj(output, 10, fps=30, filename="test_params.gif")
+        @test begin
+            result = anim_traj(output, 10, fps=30, filename="test_params.gif")
+            return result !== nothing && isfile("test_params.gif")
+        end
         
         # テスト用ファイルを削除
         if isfile("test_params.gif")

@@ -93,7 +93,7 @@ using Test
         end
         
         # サンプル数が増えるとイベント数も増えることをテスト
-        @test length(outputs[3].times) >= length(outputs[2].times)
-        @test length(outputs[2].times) >= length(outputs[1].times)
+        @test length(outputs[3].t) >= length(outputs[2].t)
+        @test length(outputs[2].t) >= length(outputs[1].t)
     end
 end

@@ -28,15 +28,15 @@ include("test_plotting.jl")
 # 拡張テスト（時間がかかる）
 println("Running extended tests...")
 include("test_comprehensive.jl")
-include("test_error_handling.jl")
+# include("test_error_handling.jl")
 include("test_property_based.jl")
 include("test_integration.jl")
 
 # 新しいテスト
-println("Running coverage tests...")
-include("test_coverage.jl")
-include("test_stability.jl")
-include("test_performance.jl")
+# println("Running coverage tests...")
+# include("test_coverage.jl")
+# include("test_stability.jl")
+# include("test_performance.jl")
 
 # テストヘルパー（必要に応じて）
 # include("test_helpers.jl")

@@ -244,22 +244,32 @@ Create a gradient function compatible with automatic differentiation.
 # Returns
 - `Function`: Gradient function that works with Float64 and ForwardDiff.Dual
 """
-function create_gradient_function(U::Function, dim::Int, AD_backend::Module)::Function
+function create_gradient_function(U::Function, dim::Int, AD_backend::String)::Function
+    Backend = eval(Symbol(AD_backend))
+    
     if dim == 1
         try
             U([1.0])
             return function(x)
-                return AD_backend.gradient(U, x)[1]
+                return Backend.gradient(U, x)[1]
             end
         catch e
             @warn "1D function detected, adapting gradient function: $e"
             return function(x)
-                return AD_backend.gradient(U, x[1])[1]
+                return Backend.gradient(U, x[1])[1]
             end
         end
     else
-        return function(x)
-            return AD_backend.gradient(U, x)[1]
+        if AD_backend == "Zygote"
+            return function(x)
+                return Backend.gradient(U, x)[1]
+            end
+        elseif AD_backend == "ForwardDiff"
+            return function(x)
+                return Backend.gradient(U, x)
+            end
+        else
+            error("Unsupported backend: $AD_backend")
         end
     end
 end
@@ -286,14 +296,11 @@ Create ForwardECMC sampler with automatic differentiation.
 - `ForwardECMC`: Configured sampler instance
 """
 function ForwardECMCAD(dim::Int, U::Function; grid_size::Int=10, tmax::Union{Float64, Int}=2.0,
-    signed_bound::Bool=true, adaptive::Bool=true, AD_backend::String="ForwardDiff",
+    signed_bound::Bool=true, adaptive::Bool=true, AD_backend::String="Zygote",
     ran_p::Bool=true, mix_p::Float64=0.5, switch::Bool=true, positive::Bool=true)
     
-    # Get AD backend module
-    AD_backend_module = eval(Symbol(AD_backend))
-    
     # Create gradient function using the helper function
-    ∇U = create_gradient_function(U, dim, AD_backend_module)
+    ∇U = create_gradient_function(U, dim, AD_backend)
     
     # Create and return sampler
     return ForwardECMC(dim, ∇U, grid_size=grid_size, tmax=tmax,

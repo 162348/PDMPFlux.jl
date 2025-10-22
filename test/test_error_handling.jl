@@ -1,4 +1,5 @@
 using Test
+using PDMPFlux
 
 @testset "Error Handling and Edge Cases" begin
     
@@ -55,9 +56,9 @@ using Test
         
         sampler_flat = ZigZagAD(1, U_Flat, grid_size=0)
         output_flat = sample_skeleton(sampler_flat, 100, 0.0, 1.0, seed=42)
-        @test all(isfinite.(output_flat.times))
-        @test all(isfinite.(output_flat.positions))
-        @test all(isfinite.(output_flat.velocities))
+        @test all(isfinite.(output_flat.t))
+        @test all(isfinite.(output_flat.x))
+        @test all(isfinite.(output_flat.v))
     end
     
     @testset "Memory and Performance Limits" begin
@@ -106,9 +107,9 @@ using Test
         output2 = sample_skeleton(sampler2, 100, 0.0, 1.0, seed=42)
         
         # 同じシードなら同じ結果
-        @test output1.times ≈ output2.times
-        @test output1.positions ≈ output2.positions
-        @test output1.velocities ≈ output2.velocities
+        @test output1.t ≈ output2.t
+        @test output1.x ≈ output2.x
+        @test output1.v ≈ output2.v
     end
     
     @testset "Resource Cleanup" begin

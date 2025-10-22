@@ -103,7 +103,7 @@ mutable struct ZigZag <: AbstractPDMP
 end
 
 function ZigZagAD(dim::Int, U::Function; refresh_rate::Float64=0.0, grid_size::Int=10, tmax::Union{Float64, Int}=2.0, 
-                    vectorized_bound::Bool=true, signed_bound::Bool=true, adaptive::Bool=true, AD_backend::String="ForwardDiff")
+                    vectorized_bound::Bool=true, signed_bound::Bool=true, adaptive::Bool=true, AD_backend::String="Zygote")
 
     ∇U = set_AD_backend(AD_backend, U, dim)
 

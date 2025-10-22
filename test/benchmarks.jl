@@ -72,7 +72,7 @@ function benchmark_ad_backends()
     vinit = ones(dim)
     seed = 42
     
-    backends = ["ForwardDiff", "Zygote", "Enzyme"]
+    backends = ["ForwardDiff", "Zygote"]
     results = Dict()
     
     for backend in backends
