@@ -8,8 +8,8 @@ using LinearAlgebra
 
 # ベンチマーク用の関数
 function benchmark_zigzag_1d()
-    function U_Gauss_1D(x::Float64)
-        return x^2 / 2
+    function U_Gauss_1D(x::AbstractVector)
+        return sum(x.^2) / 2
     end
     
     dim = 1
@@ -25,7 +25,7 @@ function benchmark_zigzag_1d()
 end
 
 function benchmark_zigzag_2d()
-    function U_Gauss_2D(x::Vector{Float64})
+    function U_Gauss_2D(x::AbstractVector)
         return sum(x.^2) / 2
     end
     
@@ -42,7 +42,7 @@ function benchmark_zigzag_2d()
 end
 
 function benchmark_forwardecmc_3d()
-    function U_Gauss_3D(x::Vector{Float64})
+    function U_Gauss_3D(x::AbstractVector)
         return sum(x.^2) / 2
     end
     
@@ -60,7 +60,7 @@ function benchmark_forwardecmc_3d()
 end
 
 function benchmark_ad_backends()
-    function U_banana(x::Vector{Float64})
+    function U_banana(x::AbstractVector)
         mean_x2 = (x[1]^2 - 1)
         return -(- x[1]^2 + -(x[2] - mean_x2)^2 - sum(x[3:end].^2)) / 2
     end

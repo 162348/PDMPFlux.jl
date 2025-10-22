@@ -1,18 +1,20 @@
 # サンプラーのテスト
 using Test
 using Statistics
+using Random
 using LinearAlgebra
+using PDMPFlux
 
 @testset "Samplers" begin
     
     @testset "ZigZag Sampler" begin
         # 1次元ガウシアンでのテスト
-        function U_Gauss_1D(x::Float64)
-            return x^2 / 2
+        function U_Gauss_1D(x::AbstractVector)
+            return sum(x.^2) / 2
         end
         
-        function ∇U_Gauss_1D(x::Float64)
-            return x
+        function ∇U_Gauss_1D(x::AbstractVector)
+            return [x[1]]
         end
         
         dim = 1
@@ -34,8 +36,8 @@ using LinearAlgebra
         @test length(output.x) > 0
         @test length(output.v) > 0
         @test all(isfinite.(output.t))
-        @test all(isfinite.(output.x))
-        @test all(isfinite.(output.v))
+        @test all(isfinite.(hcat(output.x...)))
+        @test all(isfinite.(hcat(output.v...)))
         
         # サンプル生成のテスト
         N = 1000
@@ -54,8 +56,8 @@ using LinearAlgebra
     
     @testset "ZigZagAD Sampler" begin
         # 1次元ガウシアンでのテスト
-        function U_Gauss_1D(x::Float64)
-            return x^2 / 2
+        function U_Gauss_1D(x::AbstractVector)
+            return sum(x.^2) / 2
         end
         
         dim = 1
@@ -77,27 +79,28 @@ using LinearAlgebra
         @test length(output.x) > 0
         @test length(output.v) > 0
         @test all(isfinite.(output.t))
-        @test all(isfinite.(output.x))
-        @test all(isfinite.(output.v))
+        @test all(isfinite.(hcat(output.x...)))
+        @test all(isfinite.(hcat(output.v...)))
     end
     
     @testset "ForwardECMC Sampler" begin
-        # 1次元ガウシアンでのテスト
-        function U_Gauss_1D(x::Float64)
-            return x^2 / 2
+        # 3次元ガウシアンでのテスト
+        function U_Gauss_3D(x::AbstractVector)
+            return sum(x.^2) / 2
         end
         
-        dim = 1
+        dim = 3
         grid_size = 10
-        sampler = ForwardECMCAD(dim, U_Gauss_1D, grid_size=grid_size)
+        sampler = ForwardECMCAD(dim, U_Gauss_3D, grid_size=grid_size)
         
         @test sampler.dim == dim
         @test sampler.grid_size == grid_size
         
         # スケルトンサンプリングのテスト
         N_sk = 1000
-        xinit = 0.0
-        vinit = 1.0
+        xinit = randn(dim)
+        vinit = randn(dim)
+        vinit = vinit ./ norm(vinit)
         seed = 42
         
         output = sample_skeleton(sampler, N_sk, xinit, vinit, seed=seed)
@@ -106,13 +109,13 @@ using LinearAlgebra
         @test length(output.x) > 0
         @test length(output.v) > 0
         @test all(isfinite.(output.t))
-        @test all(isfinite.(output.x))
-        @test all(isfinite.(output.v))
+        @test all(isfinite.(hcat(output.x...)))
+        @test all(isfinite.(hcat(output.v...)))
     end
     
     @testset "BPS Sampler" begin
         # 2次元ガウシアンでのテスト
-        function U_Gauss_2D(x::Vector{Float64})
+        function U_Gauss_2D(x::AbstractVector)
             return sum(x.^2) / 2
         end
         
@@ -125,8 +128,9 @@ using LinearAlgebra
         
         # スケルトンサンプリングのテスト
         N_sk = 1000
-        xinit = [0.0, 0.0]
-        vinit = [1.0, 1.0]
+        xinit = randn(dim)
+        vinit = randn(dim)
+        vinit = vinit ./ norm(vinit)
         seed = 42
         
         output = sample_skeleton(sampler, N_sk, xinit, vinit, seed=seed)
@@ -135,7 +139,7 @@ using LinearAlgebra
         @test length(output.x) > 0
         @test length(output.v) > 0
         @test all(isfinite.(output.t))
-        @test all(isfinite.(output.x))
-        @test all(isfinite.(output.v))
+        @test all(isfinite.(hcat(output.x...)))
+        @test all(isfinite.(hcat(output.v...)))
     end
 end
