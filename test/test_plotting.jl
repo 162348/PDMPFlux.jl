@@ -1,6 +1,4 @@
-"""
-プロット機能のテスト
-"""
+# プロット機能のテスト
 @testset "Plotting Functions" begin
     
     @testset "Basic Plotting Tests" begin

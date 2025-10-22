@@ -1,6 +1,4 @@
-"""
-ユーティリティ関数のテスト
-"""
+# ユーティリティ関数のテスト
 using Test
 
 @testset "Utility Functions" begin

@@ -1,11 +1,10 @@
-"""
-パフォーマンスベンチマークテスト
-注意: これらのテストは時間がかかるため、通常のテストスイートには含まれません
-"""
+# パフォーマンスベンチマークテスト
+# 注意: これらのテストは時間がかかるため、通常のテストスイートには含まれません
 
 using BenchmarkTools
 using PDMPFlux
 using Random
+using LinearAlgebra
 
 # ベンチマーク用の関数
 function benchmark_zigzag_1d()

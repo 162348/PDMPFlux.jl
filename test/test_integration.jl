@@ -1,6 +1,4 @@
-"""
-統合テスト - 実際の使用例とワークフローのテスト
-"""
+# 統合テスト - 実際の使用例とワークフローのテスト
 using Test
 using Statistics
 using LinearAlgebra

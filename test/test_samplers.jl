@@ -1,6 +1,4 @@
-"""
-サンプラーのテスト
-"""
+# サンプラーのテスト
 using Test
 using Statistics
 using LinearAlgebra

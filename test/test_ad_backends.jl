@@ -1,6 +1,4 @@
-"""
-自動微分バックエンドのテスト
-"""
+# 自動微分バックエンドのテスト
 using Test
 
 @testset "AD Backends" begin

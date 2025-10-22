@@ -1,6 +1,4 @@
-"""
-診断機能のテスト
-"""
+# 診断機能のテスト
 using Test
 
 @testset "Diagnostics" begin
