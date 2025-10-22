@@ -43,13 +43,13 @@ function benchmark_zigzag_2d()
 end
 
 function benchmark_forwardecmc_3d()
-    function U_Gauss_2D(x::Vector{Float64})
+    function U_Gauss_3D(x::Vector{Float64})
         return sum(x.^2) / 2
     end
     
     dim = 3
     grid_size = 10
-    sampler = ForwardECMCAD(dim, U_Gauss_2D, grid_size=grid_size)
+    sampler = ForwardECMCAD(dim, U_Gauss_3D, grid_size=grid_size)
     
     N_sk = 100_000
     xinit = randn(dim)

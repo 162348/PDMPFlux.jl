@@ -226,7 +226,7 @@ mutable struct ForwardECMC <: AbstractPDMP
     signed_rate = (x0, v0, t) -> _signed_rate(x0, v0, t, ∇U, flow)
     velocity_jump = (x, v, key) -> _velocity_jump_event_chain(x, v, key, ∇U, dim, mix_p, ran_p, switch, positive)
 
-    new(dim, ∇U, grid_size, tmax, refresh_rate, vectorized_bound, signed_bound, adaptive, flow, rate, rate_vect, signed_rate, signed_rate_vect, velocity_jump, nothing, ran_p, mix_p)
+    new(dim, ∇U, grid_size, tmax, refresh_rate, vectorized_bound, signed_bound, adaptive, flow, rate, rate_vect, signed_rate, signed_rate_vect, velocity_jump, nothing, ran_p, switch, mix_p)
   end
 end  # mutable struct ForwardECMC
 

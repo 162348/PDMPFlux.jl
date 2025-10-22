@@ -1,7 +1,7 @@
 """
 ユーティリティ関数のテスト
 """
-import Test
+using Test
 
 @testset "Utility Functions" begin
     
