@@ -18,7 +18,7 @@ function benchmark_zigzag_1d()
     sampler = ZigZagAD(dim, U_Gauss_1D, grid_size=grid_size)
     
     N_sk = 100_000
-    xinit = randn(dim)
+    xinit = randn(dim)[1]
     vinit = 1.0
     seed = 42
     
