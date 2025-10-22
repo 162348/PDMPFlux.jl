@@ -18,7 +18,7 @@ function benchmark_zigzag_1d()
     sampler = ZigZagAD(dim, U_Gauss_1D, grid_size=grid_size)
     
     N_sk = 100_000
-    xinit = 0.0
+    xinit = randn(dim)
     vinit = 1.0
     seed = 42
     
@@ -35,25 +35,26 @@ function benchmark_zigzag_2d()
     sampler = ZigZagAD(dim, U_Gauss_2D, grid_size=grid_size)
     
     N_sk = 100_000
-    xinit = [0.0, 0.0]
+    xinit = randn(dim)
     vinit = [1.0, 1.0]
     seed = 42
     
     return @benchmark sample_skeleton($sampler, $N_sk, $xinit, $vinit, seed=$seed)
 end
 
-function benchmark_forwardecmc_2d()
+function benchmark_forwardecmc_3d()
     function U_Gauss_2D(x::Vector{Float64})
         return sum(x.^2) / 2
     end
     
-    dim = 2
+    dim = 3
     grid_size = 10
     sampler = ForwardECMCAD(dim, U_Gauss_2D, grid_size=grid_size)
     
     N_sk = 100_000
-    xinit = [0.0, 0.0]
-    vinit = [1.0, 1.0]
+    xinit = randn(dim)
+    vinit = randn(dim)
+    vinit = vinit ./ norm(vinit)
     seed = 42
     
     return @benchmark sample_skeleton($sampler, $N_sk, $xinit, $vinit, seed=$seed)
@@ -95,8 +96,8 @@ function run_benchmarks()
     result_2d = benchmark_zigzag_2d()
     println(result_2d)
     
-    println("\n2D ForwardECMC benchmark:")
-    result_fecmc = benchmark_forwardecmc_2d()
+    println("\n3D ForwardECMC benchmark:")
+    result_fecmc = benchmark_forwardecmc_3d()
     println(result_fecmc)
     
     println("\nAD Backend comparison:")
