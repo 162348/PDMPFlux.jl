@@ -33,7 +33,7 @@
     
     @testset "Joint Plot Tests" begin
         # 2次元ガウシアンでのテスト
-        function U_Gauss_2D(x::Vector{Float64})
+        function U_Gauss_2D(x::AbstractVector)
             return sum(x.^2) / 2
         end
         
@@ -59,7 +59,7 @@
     
     @testset "3D Plotting Tests" begin
         # 3次元ガウシアンでのテスト
-        function U_Gauss_3D(x::Vector{Float64})
+        function U_Gauss_3D(x::AbstractVector)
             return sum(x.^2) / 2
         end
         

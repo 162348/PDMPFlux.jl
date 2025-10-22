@@ -45,8 +45,8 @@ using Test
         # 数値的に安定であることを確認
         output = sample_skeleton(sampler, 100, 0.0, 1.0, seed=42)
         @test all(isfinite.(output.t))
-        @test all(isfinite.(output.x))
-        @test all(isfinite.(output.v))
+        @test all(isfinite.(hcat(output.x...)))
+        @test all(isfinite.(hcat(output.v...)))
         
         # 非常に平坦なポテンシャル
         function U_Flat(x::Float64)

@@ -22,26 +22,26 @@ module TestPotentials
         return x^2 / 2
     end
     
-    function U_Gauss_2D(x::Vector{Float64})
+    function U_Gauss_2D(x::AbstractVector)
         return sum(x.^2) / 2
     end
     
-    function U_Gauss_3D(x::Vector{Float64})
+    function U_Gauss_3D(x::AbstractVector)
         return sum(x.^2) / 2
     end
     
-    function U_banana(x::Vector{Float64})
+    function U_banana(x::AbstractVector)
         mean_x2 = (x[1]^2 - 1)
         return -(- x[1]^2 + -(x[2] - mean_x2)^2 - sum(x[3:end].^2)) / 2
     end
     
-    function U_funnel(x::Vector{Float64})
+    function U_funnel(x::AbstractVector)
         d = length(x)
         v = x[1]
         return v^2 / 2 + (d-1) * log(v) + sum(x[2:end].^2) / (2 * v^2)
     end
     
-    function U_ridged_gauss(x::Vector{Float64})
+    function U_ridged_gauss(x::AbstractVector)
         return sum(x.^2) / 2 + 0.1 * sum(sin.(10 * x))
     end
 end

@@ -10,7 +10,7 @@ using BenchmarkTools
 @testset "Performance Tests" begin
     
     @testset "Basic Performance" begin
-        function U_test(x::Vector{Float64})
+        function U_test(x::AbstractVector)
             return sum(x.^2) / 2
         end
         
@@ -45,7 +45,7 @@ using BenchmarkTools
     end
     
     @testset "Scalability Tests" begin
-        function U_test(x::Vector{Float64})
+        function U_test(x::AbstractVector)
             return sum(x.^2) / 2
         end
         
@@ -97,7 +97,7 @@ using BenchmarkTools
     end
     
     @testset "Memory Usage Tests" begin
-        function U_test(x::Vector{Float64})
+        function U_test(x::AbstractVector)
             return sum(x.^2) / 2
         end
         
@@ -143,7 +143,7 @@ using BenchmarkTools
     end
     
     @testset "AD Backend Performance" begin
-        function U_test(x::Vector{Float64})
+        function U_test(x::AbstractVector)
             return sum(x.^2) / 2
         end
         
@@ -183,7 +183,7 @@ using BenchmarkTools
     end
     
     @testset "Grid Size Performance" begin
-        function U_test(x::Vector{Float64})
+        function U_test(x::AbstractVector)
             return sum(x.^2) / 2
         end
         
@@ -224,12 +224,12 @@ using BenchmarkTools
     
     @testset "Complex Potential Performance" begin
         # 複雑なポテンシャルでの性能テスト
-        function U_banana(x::Vector{Float64})
+        function U_banana(x::AbstractVector)
             mean_x2 = (x[1]^2 - 1)
             return -(- x[1]^2 + -(x[2] - mean_x2)^2 - sum(x[3:end].^2)) / 2
         end
         
-        function U_funnel(x::Vector{Float64})
+        function U_funnel(x::AbstractVector)
             d = length(x)
             v = x[1]
             return v^2 / 2 + (d-1) * log(v) + sum(x[2:end].^2) / (2 * v^2)

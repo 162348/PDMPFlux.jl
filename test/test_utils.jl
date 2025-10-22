@@ -14,7 +14,7 @@ using Test
         @test U_Gauss_1D(-2.0) == 2.0
         
         # 多次元ガウシアン
-        function U_Gauss(x::Vector{Float64})
+        function U_Gauss(x::AbstractVector)
             return sum(x.^2) / 2
         end
         
@@ -32,7 +32,7 @@ using Test
     end
     
     @testset "Banana Function" begin
-        function U_banana(x::Vector{Float64})
+        function U_banana(x::AbstractVector)
             mean_x2 = (x[1]^2 - 1)
             return -(- x[1]^2 + -(x[2] - mean_x2)^2 - sum(x[3:end].^2)) / 2
         end
@@ -50,7 +50,7 @@ using Test
     end
     
     @testset "Funnel Function" begin
-        function U_funnel(x::Vector{Float64})
+        function U_funnel(x::AbstractVector)
             y = x[1]
             log_density_y = - y^2 / 6
             variance_other = exp(y/2)

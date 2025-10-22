@@ -7,11 +7,11 @@ using Random
     
     @testset "All Sampler Types" begin
         # テスト用のポテンシャル関数
-        function U_Gauss_2D(x::Vector{Float64})
+        function U_Gauss_2D(x::AbstractVector)
             return sum(x.^2) / 2
         end
         
-        function U_Banana(x::Vector{Float64})
+        function U_Banana(x::AbstractVector)
             mean_x2 = (x[1]^2 - 1)
             return -(- x[1]^2 + -(x[2] - mean_x2)^2 - sum(x[3:end].^2)) / 2
         end
@@ -38,8 +38,8 @@ using Random
                 
         @test length(output.t) > 0
         @test all(isfinite.(output.t))
-        @test all(isfinite.(output.x))
-        @test all(isfinite.(output.v))
+        @test all(isfinite.(hcat(output.x...)))
+        @test all(isfinite.(hcat(output.v...)))
                 
                 # サンプル生成テスト
                 samples = sample_from_skeleton(sampler, N, output)
@@ -70,7 +70,7 @@ using Random
         
         # 高次元でのテスト
         @testset "High Dimensional Case" begin
-            function U_Gauss_HD(x::Vector{Float64})
+            function U_Gauss_HD(x::AbstractVector)
                 return sum(x.^2) / 2
             end
             
@@ -81,7 +81,7 @@ using Random
             
             output = sample_skeleton(sampler, 100, xinit, vinit, seed=42)
             @test length(output.t) > 0
-            @test all(isfinite.(output.x))
+            @test all(isfinite.(hcat(output.x...)))
         end
         
         # 極端な初期値でのテスト
@@ -117,7 +117,7 @@ using Random
     end
     
     @testset "Performance and Stability" begin
-        function U_Gauss_2D(x::Vector{Float64})
+        function U_Gauss_2D(x::AbstractVector)
             return sum(x.^2) / 2
         end
         
@@ -128,8 +128,8 @@ using Random
             
             @test length(output.t) > 1000  # 十分なイベントが生成される
             @test all(isfinite.(output.t))
-            @test all(isfinite.(output.x))
-            @test all(isfinite.(output.v))
+            @test all(isfinite.(hcat(output.x...)))
+            @test all(isfinite.(hcat(output.v...)))
             
             # 時間が単調増加することを確認
             @test all(diff(output.t) .> 0)
@@ -149,7 +149,7 @@ using Random
     end
     
     @testset "Mathematical Properties" begin
-        function U_Gauss_2D(x::Vector{Float64})
+        function U_Gauss_2D(x::AbstractVector)
             return sum(x.^2) / 2
         end
         

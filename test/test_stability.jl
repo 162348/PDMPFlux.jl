@@ -19,8 +19,8 @@ using LinearAlgebra
             output = sample_skeleton(sampler, 50, 0.0, 1.0, seed=42)
             @test length(output.t) > 0
             @test all(isfinite.(output.t))
-            @test all(isfinite.(output.x))
-            @test all(isfinite.(output.v))
+            @test all(isfinite.(hcat(output.x...)))
+            @test all(isfinite.(hcat(output.v...)))
         end
         
         # 非常に小さな値
@@ -155,7 +155,7 @@ using LinearAlgebra
     end
     
     @testset "Memory Management" begin
-        function U_test(x::Vector{Float64})
+        function U_test(x::AbstractVector)
             return sum(x.^2) / 2
         end
         

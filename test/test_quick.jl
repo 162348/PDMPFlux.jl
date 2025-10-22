@@ -17,8 +17,8 @@ using Random
         
         @test length(output.t) > 0
         @test all(isfinite.(output.t))
-        @test all(isfinite.(output.x))
-        @test all(isfinite.(output.v))
+        @test all(isfinite.(hcat(output.x...)))
+        @test all(isfinite.(hcat(output.v...)))
         
         # サンプル生成
         samples = sample_from_skeleton(sampler, 100, output)
@@ -27,7 +27,7 @@ using Random
     end
     
     @testset "All Sampler Types" begin
-        function U_Gauss_2D(x::Vector{Float64})
+        function U_Gauss_2D(x::AbstractVector)
             return sum(x.^2) / 2
         end
         
@@ -45,7 +45,7 @@ using Random
         
         # ForwardECMCは3次元以上が必要
         dim_3d = 3
-        function U_Gauss_3D(x::Vector{Float64})
+        function U_Gauss_3D(x::AbstractVector)
             return sum(x.^2) / 2
         end
         xinit_3d = [0.0, 0.0, 0.0]
@@ -68,7 +68,7 @@ using Random
     end
     
     @testset "AD Backends" begin
-        function U_Gauss_2D(x::Vector{Float64})
+        function U_Gauss_2D(x::AbstractVector)
             return sum(x.^2) / 2
         end
         

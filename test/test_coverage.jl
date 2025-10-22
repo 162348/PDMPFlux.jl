@@ -51,7 +51,7 @@ using Distributions
         # 高次元でのテスト
         for dim in [5, 10, 20]
             @testset "Dimension $dim" begin
-                function U_high_dim(x::Vector{Float64})
+                function U_high_dim(x::AbstractVector)
                     return sum(x.^2) / 2
                 end
                 
@@ -70,18 +70,18 @@ using Distributions
     
     @testset "Complex Potentials" begin
         # 複雑なポテンシャル関数のテスト
-        function U_banana(x::Vector{Float64})
+        function U_banana(x::AbstractVector)
             mean_x2 = (x[1]^2 - 1)
             return -(- x[1]^2 + -(x[2] - mean_x2)^2 - sum(x[3:end].^2)) / 2
         end
         
-        function U_funnel(x::Vector{Float64})
+        function U_funnel(x::AbstractVector)
             d = length(x)
             v = x[1]
             return v^2 / 2 + (d-1) * log(v) + sum(x[2:end].^2) / (2 * v^2)
         end
         
-        function U_ridged_gauss(x::Vector{Float64})
+        function U_ridged_gauss(x::AbstractVector)
             return sum(x.^2) / 2 + 0.1 * sum(sin.(10 * x))
         end
         
@@ -105,7 +105,7 @@ using Distributions
     end
     
     @testset "Sampler Comparison" begin
-        function U_test(x::Vector{Float64})
+        function U_test(x::AbstractVector)
             return sum(x.^2) / 2
         end
         
@@ -147,7 +147,7 @@ using Distributions
     end
     
     @testset "Grid Size Variations" begin
-        function U_test(x::Vector{Float64})
+        function U_test(x::AbstractVector)
             return sum(x.^2) / 2
         end
         
@@ -169,7 +169,7 @@ using Distributions
     end
     
     @testset "Memory and Performance" begin
-        function U_test(x::Vector{Float64})
+        function U_test(x::AbstractVector)
             return sum(x.^2) / 2
         end
         

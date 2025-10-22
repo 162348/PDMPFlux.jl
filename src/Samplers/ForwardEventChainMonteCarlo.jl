@@ -184,6 +184,7 @@ mutable struct ForwardECMC <: AbstractPDMP
   ran_p::Bool  # Whether to use ran-p-orthogonal refresh or orthogonal switch
   switch::Bool  # orthogonal switch or full refresh for the orthogonal component
   mix_p::Float64  # Mixture probability for refreshment
+  AD_backend::String
   # p::Int  # TODO: Number of components to be refreshed each time
 
   """
@@ -202,7 +203,7 @@ mutable struct ForwardECMC <: AbstractPDMP
   - `mix_p::Float64=0.5`: Mixture probability for refreshment
   """
   function ForwardECMC(dim::Int, ∇U::Function; grid_size::Int=10, tmax::Union{Float64, Int}=2.0,
-    signed_bound::Bool=true, adaptive::Bool=true, ran_p::Bool=false, mix_p::Float64=0.5, switch::Bool=true, positive::Bool=true)
+    signed_bound::Bool=true, adaptive::Bool=true, ran_p::Bool=false, mix_p::Float64=0.5, switch::Bool=true, positive::Bool=true, AD_backend::String="Undefined")
 
     # Input validation and preprocessing
     tmax = Float64(tmax)
@@ -226,7 +227,7 @@ mutable struct ForwardECMC <: AbstractPDMP
     signed_rate = (x0, v0, t) -> _signed_rate(x0, v0, t, ∇U, flow)
     velocity_jump = (x, v, key) -> _velocity_jump_event_chain(x, v, key, ∇U, dim, mix_p, ran_p, switch, positive)
 
-    new(dim, ∇U, grid_size, tmax, refresh_rate, vectorized_bound, signed_bound, adaptive, flow, rate, rate_vect, signed_rate, signed_rate_vect, velocity_jump, nothing, ran_p, switch, mix_p)
+    new(dim, ∇U, grid_size, tmax, refresh_rate, vectorized_bound, signed_bound, adaptive, flow, rate, rate_vect, signed_rate, signed_rate_vect, velocity_jump, nothing, ran_p, switch, mix_p, AD_backend)
   end
 end  # mutable struct ForwardECMC
 
@@ -285,7 +286,7 @@ Create ForwardECMC sampler with automatic differentiation.
 - `ForwardECMC`: Configured sampler instance
 """
 function ForwardECMCAD(dim::Int, U::Function; grid_size::Int=10, tmax::Union{Float64, Int}=2.0,
-    signed_bound::Bool=true, adaptive::Bool=true, AD_backend::String="Zygote",
+    signed_bound::Bool=true, adaptive::Bool=true, AD_backend::String="ForwardDiff",
     ran_p::Bool=true, mix_p::Float64=0.5, switch::Bool=true, positive::Bool=true)
     
     # Get AD backend module
@@ -296,5 +297,5 @@ function ForwardECMCAD(dim::Int, U::Function; grid_size::Int=10, tmax::Union{Flo
     
     # Create and return sampler
     return ForwardECMC(dim, ∇U, grid_size=grid_size, tmax=tmax,
-                      signed_bound=signed_bound, adaptive=adaptive, ran_p=ran_p, mix_p=mix_p, switch=switch, positive=positive)
+                      signed_bound=signed_bound, adaptive=adaptive, ran_p=ran_p, mix_p=mix_p, switch=switch, positive=positive, AD_backend=AD_backend)
 end

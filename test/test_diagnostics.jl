@@ -30,7 +30,7 @@ using Test
     
     @testset "Sample Statistics" begin
         # 2次元ガウシアンでのテスト
-        function U_Gauss_2D(x::Vector{Float64})
+        function U_Gauss_2D(x::AbstractVector)
             return sum(x.^2) / 2
         end
         
@@ -88,8 +88,8 @@ using Test
             # 基本的な妥当性をテスト
         @test length(output.t) > 0
         @test all(isfinite.(output.t))
-        @test all(isfinite.(output.x))
-        @test all(isfinite.(output.v))
+        @test all(isfinite.(hcat(output.x...)))
+        @test all(isfinite.(hcat(output.v...)))
         end
         
         # サンプル数が増えるとイベント数も増えることをテスト

@@ -33,15 +33,15 @@ function create_test_sampler(dim::Int, potential_type::String="gaussian", grid_s
         if dim == 1
             U(x::Float64) = x^2 / 2
         else
-            U(x::Vector{Float64}) = sum(x.^2) / 2
+            U(x::AbstractVector) = sum(x.^2) / 2
         end
     elseif potential_type == "banana"
-        U(x::Vector{Float64}) = begin
+        U(x::AbstractVector) = begin
             mean_x2 = (x[1]^2 - 1)
             -(- x[1]^2 + -(x[2] - mean_x2)^2 - sum(x[3:end].^2)) / 2
         end
     elseif potential_type == "funnel"
-        U(x::Vector{Float64}) = begin
+        U(x::AbstractVector) = begin
             d = length(x)
             v = x[1]
             v^2 / 2 + (d-1) * log(v) + sum(x[2:end].^2) / (2 * v^2)
@@ -83,8 +83,8 @@ function run_sampler_test(sampler, N::Int, xinit, vinit; seed::Int=42, T::Float6
     # 基本的な検証
     @test length(output.t) > 0
     @test all(isfinite.(output.t))
-    @test all(isfinite.(output.x))
-    @test all(isfinite.(output.v))
+    @test all(isfinite.(hcat(output.x...)))
+    @test all(isfinite.(hcat(output.v...)))
     
     # 次元の確認
     dim = length(xinit)

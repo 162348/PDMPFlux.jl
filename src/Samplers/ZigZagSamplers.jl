@@ -48,13 +48,15 @@ mutable struct ZigZag <: AbstractPDMP
     signed_rate_vect::Function
     velocity_jump::Function
     state::Any
+    AD_backend::String
 
     """
     Constructor for ZigZag sampler
         - `refresh_rate::Float64`: Not yet used 1/13/2025
     """
     function ZigZag(dim::Int, ∇U::Function; grid_size::Int=10, tmax::Union{Float64, Int}=2.0, 
-                    refresh_rate::Float64=0.0, vectorized_bound::Bool=true, signed_bound::Bool=true, adaptive::Bool=true)
+                    refresh_rate::Float64=0.0, vectorized_bound::Bool=true, signed_bound::Bool=true,
+                    adaptive::Bool=true, AD_backend::String="Undefined")
         
         tmax = Float64(tmax)  # convert tmax to Float64
 
@@ -96,16 +98,16 @@ mutable struct ZigZag <: AbstractPDMP
         end
 
         new(dim, ∇U, grid_size, tmax, refresh_rate, vectorized_bound, signed_bound, adaptive, 
-            flow, rate, rate_vect, signed_rate, signed_rate_vect, velocity_jump, nothing)
+            flow, rate, rate_vect, signed_rate, signed_rate_vect, velocity_jump, nothing, AD_backend)
     end
 end
 
 function ZigZagAD(dim::Int, U::Function; refresh_rate::Float64=0.0, grid_size::Int=10, tmax::Union{Float64, Int}=2.0, 
-                    vectorized_bound::Bool=true, signed_bound::Bool=true, adaptive::Bool=true, AD_backend::String="Zygote")
+                    vectorized_bound::Bool=true, signed_bound::Bool=true, adaptive::Bool=true, AD_backend::String="ForwardDiff")
 
     ∇U = set_AD_backend(AD_backend, U, dim)
 
     return ZigZag(dim, ∇U, refresh_rate=refresh_rate, grid_size=grid_size, tmax=tmax, vectorized_bound=vectorized_bound, 
-                    signed_bound=signed_bound, adaptive=adaptive)
+                    signed_bound=signed_bound, adaptive=adaptive, AD_backend=AD_backend)
 end
 

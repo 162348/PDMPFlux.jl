@@ -6,7 +6,7 @@ using Random
 @testset "Property-Based Tests" begin
     
     @testset "Mathematical Invariants" begin
-        function U_Gauss_2D(x::Vector{Float64})
+        function U_Gauss_2D(x::AbstractVector)
             return sum(x.^2) / 2
         end
         
@@ -50,7 +50,7 @@ using Random
         
         @testset "Scale Invariance" begin
             # スケール変換に対する不変性
-            function U_Scaled(x::Vector{Float64}, scale::Float64)
+            function U_Scaled(x::AbstractVector, scale::Float64)
                 return scale * sum(x.^2) / 2
             end
             

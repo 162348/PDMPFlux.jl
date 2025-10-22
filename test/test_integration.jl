@@ -9,7 +9,7 @@ using Random
     @testset "Real-World Workflows" begin
         @testset "Bayesian Inference Workflow" begin
             # ベイズ推論の典型的なワークフロー
-            function U_Posterior(x::Vector{Float64})
+            function U_Posterior(x::AbstractVector)
                 # 事前分布: N(0, 1)
                 prior = -sum(x.^2) / 2
                 
@@ -39,7 +39,7 @@ using Random
         
         @testset "High-Dimensional Sampling" begin
             # 高次元ガウシアン分布のサンプリング
-            function U_HighDim(x::Vector{Float64})
+            function U_HighDim(x::AbstractVector)
                 return sum(x.^2) / 2
             end
             
@@ -65,7 +65,7 @@ using Random
         
         @testset "Multi-Modal Distribution" begin
             # 多峰分布のサンプリング
-            function U_Mixture(x::Vector{Float64})
+            function U_Mixture(x::AbstractVector)
                 # 2つのガウシアンの混合
                 x1 = x[1]
                 mode1 = -((x1 - 2.0)^2) / 2
@@ -87,7 +87,7 @@ using Random
     end
     
     @testset "Cross-Sampler Comparisons" begin
-        function U_Gauss_2D(x::Vector{Float64})
+        function U_Gauss_2D(x::AbstractVector)
             return sum(x.^2) / 2
         end
         
@@ -132,7 +132,7 @@ using Random
     end
     
     @testset "Performance Integration" begin
-        function U_Gauss_2D(x::Vector{Float64})
+        function U_Gauss_2D(x::AbstractVector)
             return sum(x.^2) / 2
         end
         
@@ -254,8 +254,8 @@ using Random
                 output = sample_skeleton(sampler, 100, x0, v0, seed=42)
                 @test length(output.t) > 0
                 @test all(isfinite.(output.t))
-                @test all(isfinite.(output.x))
-                @test all(isfinite.(output.v))
+                @test all(isfinite.(hcat(output.x...)))
+                @test all(isfinite.(hcat(output.v...)))
             end
         end
     end
