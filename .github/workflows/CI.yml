@@ -42,6 +42,7 @@ jobs:
         with:
           test_args: 'quick'
           annotate: true
+          depwarn: 'no'
       - uses: julia-actions/julia-processcoverage@v1
       - uses: codecov/codecov-action@v5
         with:
@@ -65,7 +66,7 @@ jobs:
           - ubuntu-latest
           - macOS-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: julia-actions/setup-julia@v2
         with:
           version: ${{ matrix.version }}
@@ -78,6 +79,7 @@ jobs:
         with:
           test_args: 'extended'
           annotate: true
+          depwarn: 'no'
   test-coverage:
     name: Coverage Tests - Julia 1.11 - Ubuntu
     runs-on: ubuntu-latest
@@ -86,7 +88,7 @@ jobs:
       actions: write
       contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: julia-actions/setup-julia@v2
         with:
           version: '1.11'
@@ -98,6 +100,7 @@ jobs:
       - uses: julia-actions/julia-runtest@v1
         with:
           annotate: true
+          depwarn: 'no'
       - uses: julia-actions/julia-processcoverage@v1
       - uses: codecov/codecov-action@v5
         with:
