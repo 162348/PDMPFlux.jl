@@ -100,93 +100,37 @@ Inspired by [Andral and Kamatani (2024)](https://arxiv.org/abs/2408.03682) and t
 
 proposed by [Bierkens, Fearnhead & Roberts (2019)](https://projecteuclid.org/journals/annals-of-statistics/volume-47/issue-3/The-Zig-Zag-process-and-super-efficient-sampling-for-Bayesian/10.1214/18-AOS1715.full).
 
-![](assets/SlantedGauss/ZigZag_SlantedGauss2D.gif)
+![](https://github.com/162348/162348.github.io/blob/main/posts/2024/Julia/assets/SlantedGauss/ZigZag_SlantedGauss2D.gif?raw=true)
 
 ### Bouncy Particle Sampler (BPS)
 
 proposed by [Bouchard-Côte et. al. (2018)](https://www.tandfonline.com/doi/full/10.1080/01621459.2017.1294075).
 
-![](assets/SlantedGauss/BPS_SlantedGauss2D.gif)
+![](https://github.com/162348/162348.github.io/blob/main/posts/2024/Julia/assets/SlantedGauss/BPS_SlantedGauss2D.gif?raw=true)
 
 ### Forward Event Chain Monte Carlo (Forward ECMC)
 
 proposed by [Michel, Durmus & Sénécal (2020)](https://www.tandfonline.com/doi/full/10.1080/10618600.2020.1750417).
 
-![](assets/SlantedGauss/ForwardECMC_SlantedGauss2D.gif)
+![](https://github.com/162348/162348.github.io/blob/main/posts/2024/Julia/assets/SlantedGauss/ForwardECMC_SlantedGauss2D.gif?raw=true)
 
 ### Boomerang Sampler
 
 proposed by [Bierkens et. al. (2020)](https://proceedings.mlr.press/v119/bierkens20a.html).
 
-![](assets/SlantedGauss/Boomerang_SlantedGauss2D.gif)
+![](https://github.com/162348/162348.github.io/blob/main/posts/2024/Julia/assets/SlantedGauss/Boomerang_SlantedGauss2D.gif?raw=true)
 
 ### Speed Up Zig-Zag (SUZZ)
 
 proposed by [Vasdekis and Roberts (2023)](https://projecteuclid.org/journals/annals-of-applied-probability/volume-33/issue-6A/Speed-up-Zig-Zag/10.1214/23-AAP1930.full).
 
-![](assets/SlantedGauss/SUZZ_SlantedGauss2D.gif)
+![](https://github.com/162348/162348.github.io/blob/main/posts/2024/Julia/assets/SlantedGauss/SUZZ_SlantedGauss2D.gif?raw=true)
 
 ### Sticky Zig-Zag Sampler
 
 proposed in [Bierkens et. al. (2023)](https://link.springer.com/article/10.1007/s11222-022-10180-5).
 
-![](assets/SlantedGauss/StickyZigZag_SlantedGauss2D.gif)
-
-## Gallery
-
-<table>
-    <tbody>
-        <tr>
-            <td style="width: 25%;"><img src="examples/Funnel/Funnel_GroundTruthSamples.svg"></td>
-            <td style="width: 25%;"><img src="examples/Funnel/ZigZag_Funnel2D_trajectory.svg"></td>
-            <td style="width: 25%;"><img src="examples/Funnel/ZigZag_Funnel2D.gif"></td>
-            <td style="width: 25%;"><img src="examples/Funnel/ZigZag_Funnel3D.gif"></td>
-        </tr>
-        <tr>
-            <td align="center"><a href="examples/ZigZag_Funnel3D.jl"><sup>2D</sup> Funnel Distribution (Ground Truth)</a></td>
-            <td align="center"><a href="examples/ZigZag_Funnel3D.jl"><sup>2D</sup> Zig-Zag Trajectory (T<sub>max</sub>=10000)</a></td>
-            <td align="center"><a href="examples/ZigZag_Funnel2D.jl"><sup>2D</sup> Zig-Zag on Funnel</a></td>
-            <td align="center"><a href="examples/ZigZag_Funnel3D.jl"><sup>3D</sup> Zig-Zag on Funnel</a></td>
-        </tr>
-        <tr>
-            <td style="width: 25%;"><img src="assets/banana_density.svg"></td>
-            <td style="width: 25%;"><img src="assets/banana_jointplot.svg"></td>
-            <td style="width: 25%;"><img src="examples/Banana/ZigZag_Banana2D.gif"></td>
-            <td style="width: 25%;"><img src="examples/Banana/ZigZag_Banana3D.gif"></td>
-        </tr>
-        <tr>
-            <td align="center"><a href="test/runtests.jl"><sup>2D</sup> Banana Density Contour (Ground Truth)</a></td>
-            <td align="center"><a href="test/runtests.jl"><sup>2D</sup> Zig-Zag Sample Jointplot</a></td>
-            <td align="center"><a href="examples/Banana/ZigZag_Banana2D.jl"><sup>2D</sup> Zig-Zag on Banana</a></td>
-            <td align="center"><a href="examples/Banana/ZigZag_Banana3D.jl"><sup>3D</sup> Zig-Zag on Banana</a></td>
-        </tr>
-    </tbody>
-</table>
-
-<table>
-    <tbody>
-        <tr>
-            <td style="width: 33%;"><img src="assets/Cauchy1D.gif"></td>
-            <td style="width: 33%;"><img src="assets/Gauss1D.gif"></td>
-            <td style="width: 33%;"><img src="assets/densities.svg"></td>
-        </tr>
-        <tr>
-            <td align="center"><a href="test/1d_test.jl"><sup>1D</sup> Zig-Zag on Cauchy</a></td>
-            <td align="center"><a href="test/1d_test.jl"><sup>1D</sup> Zig-Zag on Gaussian</a></td>
-            <td align="center"><a href="test/1d_test.jl">Cauchy vs. Gaussian Density Plot</a></td>
-        </tr>
-        <tr>
-            <td style="width: 33%;"><img src="assets/SlantedGauss/ZigZag_SlantedGauss2D.gif"></td>
-            <td style="width: 33%;"><img src="assets/SlantedGauss/BPS_SlantedGauss2D.gif"></td>
-            <td style="width: 33%;"><img src="assets/SlantedGauss/ForwardECMC_SlantedGauss2D.gif"></td>
-        </tr>
-        <tr>
-            <td style="width: 33%;"><img src="assets/SlantedGauss/Boomerang_SlantedGauss2D.gif"></td>
-            <td style="width: 33%;"><img src="assets/SlantedGauss/SUZZ_SlantedGauss2D.gif"></td>
-            <td style="width: 33%;"><img src="assets/SlantedGauss/StickyZigZag_SlantedGauss2D.gif"></td>
-        </tr>
-    </tbody>
-</table>
+![](https://github.com/162348/162348.github.io/blob/main/posts/2024/Julia/assets/SlantedGauss/StickyZigZag_SlantedGauss2D.gif?raw=true)
 
 ## Remarks
 
@@ -209,13 +153,3 @@ proposed in [Bierkens et. al. (2023)](https://link.springer.com/article/10.1007/
   * R
     * [`rjpdmp`](https://github.com/matt-sutton/rjpdmp) by [Matthew Sutton](https://github.com/matt-sutton)
     * [`RZigZag`](https://github.com/jbierkens/RZigZag) by [Joris Bierkens](https://github.com/jbierkens)
-
-
-## Changelog
-
-- v0.1.0: Initial release.
-- v0.2.0: ForwardDiff.jl, ReverseDiff.jl are supported as custom backend AD engines.
-- v0.3.0: New 5 samplers are implemented, accompanied by the new abstract type StickyPDMP.
-- v0.4.0: 
-  - Added additional argument `p` to `ForwardECMC` sampler.
-  - Added additional argument `μ` to `BPS` sampler.
