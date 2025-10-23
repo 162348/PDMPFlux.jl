@@ -82,7 +82,7 @@ jobs:
           depwarn: 'no'
   test-coverage:
     name: Coverage Tests - Julia 1.11 - Ubuntu
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     timeout-minutes: 60
     permissions:
       actions: write
