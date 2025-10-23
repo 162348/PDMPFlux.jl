@@ -22,20 +22,30 @@ end
 
 using LaTeXStrings
 
-function plot_traj(history::PDMPHistory, N_max::Int; plot_type="2D", color="#78C2AD", background="#FFF", linewidth=2, filename::Union{String, Nothing}=nothing)
-    N_max = min(N_max, length(history.t))  # avoids BoundsError
+function plot_traj(history::PDMPHistory, N_max::Int; plot_type="2D", color="#78C2AD", background="#FFF",
+    title::Union{String, LaTeXString}="Trajectory (up to $N_max events)", linewidth=2,
+    n_start::Int=1, filename::Union{String, Nothing}=nothing, xv_plot = false, kwargs...)
+
+    N_max = min(N_max, length(history.t))  # to avoid BoundsError
     traj = hcat(history.x...)
-    if traj.size[1] == 1
-        p = Plots.plot(1:N_max, traj[1,1:N_max], xlabel = L"t", ylabel = L"x", title = "Trajectory (up to $N_max events)", label=false, color=color, background=background, linewidth=linewidth)
-    elseif plot_type == "2D"
-        p = Plots.plot(traj[1,1:N_max], traj[2,1:N_max], xlabel = L"x_1", ylabel = L"x_2", title = "Trajectory (up to $N_max events)", label=false, color=color, background=background, linewidth=linewidth)
+    time_stamps = history.t[n_start:N_max]
+
+    if !xv_plot
+        if traj.size[1] == 1
+            p = Plots.plot(time_stamps, traj[1,n_start:N_max], xlabel = L"t", ylabel = L"x", title = title, label=false, color=color, background=background, linewidth=linewidth; kwargs...)
+        elseif plot_type == "2D"
+            p = Plots.plot(traj[1,n_start:N_max], traj[2,n_start:N_max], xlabel = L"x_1", ylabel = L"x_2", title = title, label=false, color=color, background=background, linewidth=linewidth; kwargs...)
+        else
+            p = Plots.plot(traj[1,n_start:N_max], traj[2,n_start:N_max], traj[3,n_start:N_max], xlabel = L"x_1", ylabel = L"x_2", zlabel = L"x_3", title = title, label=false, color=color, background=background, linewidth=linewidth; kwargs...)
+        end
     else
-        p = Plots.plot(traj[1,1:N_max], traj[2,1:N_max], traj[3,1:N_max], xlabel = L"x_1", ylabel = L"x_2", zlabel = L"x_3", title = "Trajectory (up to $N_max events)", label=false, color=color, background=background, linewidth=linewidth)
+        traj_v = hcat(history.v...)
+        p = Plots.plot(traj[1,n_start:N_max], traj_v[1,n_start:N_max], xlabel = L"x", ylabel = L"v", title = title, label=false, color=color, background=background, linewidth=linewidth; kwargs...)
     end
 
     if !isnothing(filename)
-        filename = isnothing(filename) ? "PDMPFlux_Trajectory.png" : filename
-        filename = endswith(filename, ".png") ? filename : filename * ".png"
+        filename = isnothing(filename) ? "PDMPFlux_Trajectory.svg" : filename
+        filename = contains(filename, ".") ? filename : filename * ".svg"
         savefig(p, filename)
     end
 
@@ -51,7 +61,7 @@ function anim_traj(history::PDMPHistory, N_max::Int; N_start::Int=1, plot_start:
     title::Union{String, LaTeXString}="Trajectory (from $N_start to $N_max events)",
     nonlinear_flow::Union{Function, Nothing}=nothing)
 
-    N_max = min(N_max, length(history.t), frame_upper_limit)  # avoids BoundsError
+    N_max = min(N_max, length(history.t), frame_upper_limit)  # to avoid BoundsError
     time_stamps = history.t[N_start:N_max]
 
     if length(history.x[1]) == 1 || plot_type == "1D"  # if dim = 1, horizontal axis is time

@@ -12,11 +12,11 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ startsWith(github.ref, 'refs/pull/') }}
 jobs:
-  test:
-    name: Julia ${{ matrix.version }} - ${{ matrix.os }} - ${{ matrix.arch }} - ${{ github.event_name }}
+  test-quick:
+    name: Quick Tests - Julia ${{ matrix.version }} - ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 60
-    permissions: # needed to allow julia-actions/cache to proactively delete old caches that it has created
+    timeout-minutes: 30
+    permissions:
       actions: write
       contents: read
     strategy:
@@ -24,26 +24,83 @@ jobs:
       matrix:
         version:
           - '1.11'
-          - 'pre'
         os:
           - ubuntu-latest
           - macOS-latest
           - windows-latest
-        arch:
-          # - x86  # LoadError with ProgressBars, Plots, StatsPlots.
-          - x64
-        # exclude:
-        #   - os: macOS-latest
-        #     arch: x86
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: julia-actions/setup-julia@v2
         with:
           version: ${{ matrix.version }}
-          arch: ${{ matrix.arch }}
       - uses: julia-actions/cache@v2
-      - uses: julia-actions/julia-buildpkg@latest
-      - uses: julia-actions/julia-runtest@latest
+      - uses: julia-actions/julia-buildpkg@v1
+      - name: Configure GR headless (Linux only)
+        if: runner.os == 'Linux'
+        run: echo "GKS_WSTYPE=100" >> $GITHUB_ENV
+      - uses: julia-actions/julia-runtest@v1
+        with:
+          test_args: 'quick'
+          annotate: true
+          depwarn: 'no'
+      - uses: julia-actions/julia-processcoverage@v1
+      - uses: codecov/codecov-action@v5
+        with:
+          files: lcov.info
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false
+          
+  test-extended:
+    name: Extended Tests - Julia ${{ matrix.version }} - ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 120
+    permissions:
+      actions: write
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        version:
+          - '1.11'
+        os:
+          - ubuntu-latest
+          - macOS-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: ${{ matrix.version }}
+      - uses: julia-actions/cache@v2
+      - uses: julia-actions/julia-buildpkg@v1
+      - name: Configure GR headless (Linux only)
+        if: runner.os == 'Linux'
+        run: echo "GKS_WSTYPE=100" >> $GITHUB_ENV
+      - uses: julia-actions/julia-runtest@v1
+        with:
+          test_args: 'extended'
+          annotate: true
+          depwarn: 'no'
+  test-coverage:
+    name: Coverage Tests - Julia 1.11 - Ubuntu
+    runs-on: macos-latest
+    timeout-minutes: 60
+    permissions:
+      actions: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: '1.11'
+      - uses: julia-actions/cache@v2
+      - uses: julia-actions/julia-buildpkg@v1
+      - name: Configure GR headless (Linux only)
+        if: runner.os == 'Linux'
+        run: echo "GKS_WSTYPE=100" >> $GITHUB_ENV
+      - uses: julia-actions/julia-runtest@v1
+        with:
+          annotate: true
+          depwarn: 'no'
       - uses: julia-actions/julia-processcoverage@v1
       - uses: codecov/codecov-action@v5
         with:
@@ -58,7 +115,7 @@ jobs:
       contents: write
       statuses: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: julia-actions/setup-julia@v2
         with:
           version: '1'

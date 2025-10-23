@@ -1,4 +1,4 @@
-# PDMPFlux developed by Hirofumi Shiba
+# PDMPFlux
 
 | Documentation | Workflows | Code Coverage | Quality Assurance |
 |:-------------:|:---------:|:-------------:|:-----------------:|
@@ -9,6 +9,7 @@
 `PDMPFlux.jl` provides a fast and efficient implementation of **Piecewise Deterministic Markov Process (PDMP)** samplers, using a grid-based Poisson thinning approach proposed in [Andral and Kamatani (2024)](https://arxiv.org/abs/2408.03682).
 
 By the means of the automatic differentiation engines, `PDMPFlux.jl` only requires `dim` and `U`, which is the negative log density of the target distribution (e.g., posterior).
+
 $$
 U(x) = -\log p(x) + \text{const}.
 $$
@@ -208,3 +209,13 @@ proposed in [Bierkens et. al. (2023)](https://link.springer.com/article/10.1007/
   * R
     * [`rjpdmp`](https://github.com/matt-sutton/rjpdmp) by [Matthew Sutton](https://github.com/matt-sutton)
     * [`RZigZag`](https://github.com/jbierkens/RZigZag) by [Joris Bierkens](https://github.com/jbierkens)
+
+
+## Changelog
+
+- v0.1.0: Initial release.
+- v0.2.0: ForwardDiff.jl, ReverseDiff.jl are supported as custom backend AD engines.
+- v0.3.0: New 5 samplers are implemented, accompanied by the new abstract type StickyPDMP.
+- v0.4.0: 
+  - Added additional argument `p` to `ForwardECMC` sampler.
+  - Added additional argument `μ` to `BPS` sampler.

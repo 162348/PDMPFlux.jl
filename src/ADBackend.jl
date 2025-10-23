@@ -4,35 +4,37 @@ using Zygote, ForwardDiff, ReverseDiff, PolyesterForwardDiff
   Set the AD backend for the <sampler name>AD() constructors defined in src/Samplers/*.jl
 """
 function set_AD_backend(AD_backend::String, U::Function, dim::Int)::Function
-  ∇U = nothing
-  AD_backend = eval(Symbol(AD_backend))
+  
+  Backend = eval(Symbol(AD_backend))
 
   ## If U is one dimensional and takes Float64 instead of Vector{Float64}, change ∇U accordingly:
   if dim == 1
     try
       U([1.0])
     catch
-      ∇U = function(x::Vector)
-          return AD_backend.gradient(U, x[1])[1]
+      if AD_backend == "ForwardDiff"
+        return function(x::Vector)
+          return Backend.derivative(U, x[1])
+        end
+      elseif AD_backend == "Zygote"
+      return function(x::Vector)
+          return Backend.gradient(U, x[1])[1]
       end
-    else
-      if AD_backend == eval(Symbol(AD_backend))
-        ∇U = function(x::Vector)
-          return AD_backend.jacobian(U, x)[1][1,1]
-        end
-      else
-        ∇U = function(x::Vector)
-          return AD_backend.jacobian(U, x)[1]
-        end
       end
     end
-  else
-      ∇U = function(x::Vector)
-          return AD_backend.gradient(U, x)[1]
-      end
   end
 
-  return ∇U
+  if AD_backend == "Zygote"
+    return function(x::Vector)
+        return Zygote.gradient(U, x)[1]
+    end
+  elseif AD_backend == "ForwardDiff"
+    return function(x::Vector)
+        return Backend.gradient(U, x)
+    end
+  else
+    error("Unsupported backend: $AD_backend")
+  end
 end
 
 function threaded_gradient(f, x::AbstractArray, chunk::ForwardDiff.Chunk{C}, check = Val{false}()) where {C}

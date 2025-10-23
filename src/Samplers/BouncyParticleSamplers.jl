@@ -58,7 +58,9 @@ mutable struct BPS <: AbstractPDMP
         if u < bounce_prob
             return reflect(v, ∇Ux)
         else
-            return randn(dim)
+            v = randn(dim)
+            return v ./ norm(v)
+            # return randn(dim)
         end
     end
 

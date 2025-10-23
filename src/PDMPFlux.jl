@@ -24,6 +24,6 @@ export sample, sample_skeleton, sample_from_skeleton
 include("diagnostic.jl")
 include("plot.jl")
 
-export diagnostic, plot_traj, anim_traj, jointplot
+export diagnostic, plot_traj, anim_traj, jointplot, marginalplot
 
 end

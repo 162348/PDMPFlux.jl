@@ -8,7 +8,7 @@ using Distributions
 # arguments for constructor
 - `dim::Int`: dimension of the parameter space
 - `∇U::Function`: gradient of the potential function (= negative log-likelihood function)
-- `κ::Vector{Float64}`: prior inclusion probability. default is fill(0.5, dim).
+- `κ::Vector{Float64}`: thawing rate defined from prior inclusion probability. default is fill(0.5, dim).
 
 - `grid_size::Int`: number of the grid points for discretization of the parameter space. default is 10.
 - `tmax::Float64`: グリッドのホライズン．デフォルトは1.0．0の場合、適応的なtmaxが使用されます．
