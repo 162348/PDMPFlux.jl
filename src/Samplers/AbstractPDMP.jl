@@ -85,6 +85,10 @@ function init_state(pdmp::AbstractPDMP, xinit::Array{Float64}, vinit::Array{Floa
         refresh_rate = 0.0
     end
 
+    if pdmp.grid_size < 0
+        throw(ArgumentError("grid_size must be non-negative. Current value: $grid_size"))
+    end
+
     # グリッドサイズが0の場合、Brentのアルゴリズムを使用して定数上限戦略を使用
     if pdmp.grid_size == 0
         upper_bound_func = function(x, v, horizon)

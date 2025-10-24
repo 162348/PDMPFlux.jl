@@ -105,6 +105,11 @@ function sample_skeleton(
     verbose::Bool=true
 )::PDMPHistory
 
+    # NaN/Inf値の検証を追加
+    if !isfinite(xinit) || !isfinite(vinit)
+        throw(ArgumentError("initial values contain NaN, Inf, or -Inf."))
+    end
+
     xinit = [Float64(xinit)]
     vinit = [Float64(vinit)]
     return sample_skeleton(sampler, N, xinit, vinit, seed=seed, verbose=verbose)

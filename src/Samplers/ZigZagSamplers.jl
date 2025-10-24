@@ -58,6 +58,10 @@ mutable struct ZigZag <: AbstractPDMP
                     refresh_rate::Float64=0.0, vectorized_bound::Bool=true, signed_bound::Bool=true,
                     adaptive::Bool=true, AD_backend::String="Undefined")
         
+        if dim <= 0
+            throw(ArgumentError("dimension dim must be positive. Current value: $dim"))
+        end
+
         tmax = Float64(tmax)  # convert tmax to Float64
 
         # select tmax adaptively if tmax was 0

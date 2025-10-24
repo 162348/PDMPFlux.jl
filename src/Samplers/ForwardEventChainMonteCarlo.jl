@@ -269,7 +269,7 @@ function create_gradient_function(U::Function, dim::Int, AD_backend::String)::Fu
                 return Backend.gradient(U, x)
             end
         else
-            error("Unsupported backend: $AD_backend")
+            throw(ArgumentError("Unsupported backend: $AD_backend"))
         end
     end
 end

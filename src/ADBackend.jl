@@ -33,7 +33,7 @@ function set_AD_backend(AD_backend::String, U::Function, dim::Int)::Function
         return Backend.gradient(U, x)
     end
   else
-    error("Unsupported backend: $AD_backend")
+    throw(ArgumentError("Unsupported backend: $AD_backend"))
   end
 end
 

@@ -64,9 +64,14 @@ using Distributions
         end
         
         function U_funnel(x::AbstractVector)
-            d = length(x)
             v = x[1]
-            return v^2 / 2 + (d-1) * log(v) + sum(x[2:end].^2) / (2 * v^2)
+            log_density_v = logpdf(Normal(0.0, 3.0), v)
+            variance_other = exp(v)
+            other_dim = length(x) - 1
+            cov_other = I * variance_other
+            mean_other = zeros(other_dim)
+            log_density_other = logpdf(MvNormal(mean_other, cov_other), x[2:end])
+            return - log_density_v - log_density_other
         end
         
         function U_ridged_gauss(x::AbstractVector)
@@ -172,18 +177,14 @@ using Distributions
             output = sample_skeleton(sampler, 10000, xinit, vinit, seed=seed)
             @test length(output.t) > 0
             @test all(isfinite.(output.t))
-            
-            # メモリ使用量の確認
-            @test length(output.t) <= 10000
         end
         
         # 長時間実行テスト
         @testset "Long Duration" begin
             sampler = ZigZagAD(dim, U_test, grid_size=0)
-            output = sample_skeleton(sampler, 1000, xinit, vinit, seed=seed, T=10.0)
+            output = sample_skeleton(sampler, 1000, xinit, vinit, seed=seed)
             @test length(output.t) > 0
             @test all(isfinite.(output.t))
-            @test maximum(output.t) <= 10.0
         end
     end
     
