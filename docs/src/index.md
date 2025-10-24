@@ -28,5 +28,5 @@ jointplot(samples)
 ```@autodocs
 Modules = [PDMPFlux]
 Private = false
-Order   = [:module, :type, :function, :macro]
+Order   = [:module, :function, :type, :macro]
 ```

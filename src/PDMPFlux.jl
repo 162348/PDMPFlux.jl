@@ -4,6 +4,8 @@ include("Composites.jl")
 include("ADBackend.jl")
 include("UpperBound.jl")
 
+export PDMPState, PDMPHistory
+
 include("Samplers/AbstractPDMP.jl")
 include("Samplers/StickyPDMP.jl")
 include("Samplers/ZigZagSamplers.jl")

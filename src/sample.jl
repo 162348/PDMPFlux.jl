@@ -98,7 +98,7 @@ end
 """
 function sample_skeleton(
     sampler::AbstractPDMP,
-    n_sk::Int,
+    N::Int,
     xinit::Union{Float64, Int},
     vinit::Union{Float64, Int};
     seed::Int=nothing,
@@ -107,7 +107,7 @@ function sample_skeleton(
 
     xinit = [Float64(xinit)]
     vinit = [Float64(vinit)]
-    return sample_skeleton(sampler, n_sk, xinit, vinit, seed=seed, verbose=verbose)
+    return sample_skeleton(sampler, N, xinit, vinit, seed=seed, verbose=verbose)
 
 end
 
@@ -124,6 +124,30 @@ end
 function sample_from_skeleton(sampler::AbstractPDMP, N::Int, history::PDMPHistory; discard_vt = true)::Matrix{Float64}
     x, v, t = history.x, history.v, history.t
     tm = (t[end] / N) .* collect(1:N)  # equidistant time points
+    indeces = searchsortedfirst.(Ref(t), tm) .- 1  # previous index
+    samples = map(tuple -> sampler.flow(x[tuple[1]], v[tuple[1]] .* history.is_active[tuple[1]], tm[tuple[2]] - t[tuple[1]])[1], zip(indeces, 1:N))  # flow を通じて位置を取得
+    if discard_vt
+        return hcat(samples...)
+    else 
+        samples_v = map(tuple -> sampler.flow(x[tuple[1]], v[tuple[1]] .* history.is_active[tuple[1]], tm[tuple[2]] - t[tuple[1]])[2], zip(indeces, 1:N))  # flow を通じて位置を取得
+        return vcat(hcat(samples...), hcat(samples_v...), hcat(tm)')
+    end
+end
+
+"""
+    スケルトンからサンプリングをし，各行ベクトルに次元毎の時系列が格納された Matrix{Float64} を返す．
+
+    Args:
+        dt (Float64): The time step.
+        output (PdmpOutput): The PDMP output containing the trajectory information.
+
+    Returns:
+        Array{Float64, 2}: The sampled points from the PDMP trajectory skeleton.
+"""
+function sample_from_skeleton(sampler::AbstractPDMP, dt::Float64, history::PDMPHistory; discard_vt = true)::Matrix{Float64}
+    x, v, t = history.x, history.v, history.t
+    tm = dt:dt:t[end]  # equidistant time points
+    N = length(tm)
     indeces = searchsortedfirst.(Ref(t), tm) .- 1  # previous index
     samples = map(tuple -> sampler.flow(x[tuple[1]], v[tuple[1]] .* history.is_active[tuple[1]], tm[tuple[2]] - t[tuple[1]])[1], zip(indeces, 1:N))  # flow を通じて位置を取得
     if discard_vt
