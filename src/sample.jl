@@ -55,8 +55,6 @@ function sample(
 
 end
 
-using Debugger
-
 """
     sample_skeleton(): PDMP Samplers からスケルトンを抽出する．
 
@@ -149,8 +147,80 @@ end
     Returns:
         Array{Float64, 2}: The sampled points from the PDMP trajectory skeleton.
 """
-function sample_from_skeleton(sampler::AbstractPDMP, dt::Float64, history::PDMPHistory; discard_vt = true)::Matrix{Float64}
-    x, v, t = history.x, history.v, history.t
+function sample_from_skeleton(
+    sampler::AbstractPDMP,
+    dt::Float64,
+    history::PDMPHistory;
+    discard_vt::Bool = true,
+)
+    return _sample_from_skeleton_impl(sampler, dt, history, discard_vt, false)
+end
+
+# sticky だけ active を使う版
+function sample_from_skeleton(
+    sampler::StickyPDMP,
+    dt::Float64,
+    history::PDMPHistory;
+    discard_vt::Bool = true,
+)
+    return _sample_from_skeleton_impl(sampler, dt, history, discard_vt, true)
+end
+
+function _sample_from_skeleton_impl(
+    sampler,
+    dt::Float64,
+    history::PDMPHistory,
+    discard_vt::Bool,
+    use_active::Bool,
+)
+    xhist = history.x
+    vhist = history.v
+    thist = history.t
+    active = history.is_active
+
+    T_end = thist[end]
+    n_skel = Int(floor(T_end / dt))
+
+    d = length(xhist[1])
+
+    if discard_vt
+        out = Matrix{Float64}(undef, d, n_skel)
+    else
+        out = Matrix{Float64}(undef, 2d + 1, n_skel)
+    end
+
+    i = 1
+    N = length(thist)
+
+    @inbounds for j in 1:n_skel
+        t = j * dt
+        while i < N && thist[i+1] <= t
+            i += 1
+        end
+
+        τ  = t - thist[i]
+        x0 = xhist[i]
+        v0 = vhist[i]
+
+        if use_active
+            x_new, v_new = sampler.flow(x0, v0 .* active[i], τ)
+        else
+            x_new, v_new = sampler.flow(x0, v0, τ)
+        end
+
+        out[1:d, j] = x_new
+        if !discard_vt
+            out[d+1:2d, j] = v_new
+            out[2d+1, j]   = t
+        end
+    end
+
+    return out
+end
+
+
+function sample_from_skeleton(sampler::AbstractPDMP, N::Int, dt::Float64, history::PDMPHistory; discard_vt = true)::Matrix{Float64}
+    x, v, t = history.x[1:N], history.v[1:N], history.t[1:N]
     tm = dt:dt:t[end]  # equidistant time points
     N = length(tm)
     indeces = searchsortedfirst.(Ref(t), tm) .- 1  # previous index
@@ -161,4 +231,20 @@ function sample_from_skeleton(sampler::AbstractPDMP, dt::Float64, history::PDMPH
         samples_v = map(tuple -> sampler.flow(x[tuple[1]], v[tuple[1]] .* history.is_active[tuple[1]], tm[tuple[2]] - t[tuple[1]])[2], zip(indeces, 1:N))  # flow を通じて位置を取得
         return vcat(hcat(samples...), hcat(samples_v...), hcat(tm)')
     end
+end
+
+function previous_indices(thist::Vector{Float64}, tm::Vector{Float64})
+    N = length(thist)
+    M = length(tm)
+    idx = Vector{Int}(undef, M)
+
+    i = 1
+    @inbounds for j in 1:M
+        t = tm[j]
+        while i < N && thist[i+1] <= t
+            i += 1
+        end
+        idx[j] = i
+    end
+    return idx
 end

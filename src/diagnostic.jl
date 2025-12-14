@@ -24,7 +24,7 @@ using LaTeXStrings
 
 function plot_traj(history::PDMPHistory, N_max::Int; plot_type="2D", color="#78C2AD", background="#FFF",
     title::Union{String, LaTeXString}="Trajectory (up to $N_max events)", linewidth=2,
-    n_start::Int=1, filename::Union{String, Nothing}=nothing, xv_plot = false, kwargs...)
+    n_start::Int=1, filename::Union{String, Nothing}=nothing, xv_plot = false, contour_plot = false, kwargs...)
 
     N_max = min(N_max, length(history.t))  # to avoid BoundsError
     traj = hcat(history.x...)
@@ -46,6 +46,97 @@ function plot_traj(history::PDMPHistory, N_max::Int; plot_type="2D", color="#78C
     if !isnothing(filename)
         filename = isnothing(filename) ? "PDMPFlux_Trajectory.svg" : filename
         filename = contains(filename, ".") ? filename : filename * ".svg"
+        savefig(p, filename)
+    end
+
+    return p
+end
+
+function plot_traj!(p, history::PDMPHistory, N_max::Int; plot_type="2D", color="#78C2AD", background=:transparent,
+    title::Union{String, LaTeXString}="Trajectory (up to $N_max events)", linewidth=2,
+    n_start::Int=1, filename::Union{String, Nothing}=nothing, xv_plot = false,
+    show_title::Bool=true, show_grid::Bool=false, show_axis::Bool=false,
+    kwargs...)
+
+    N_max = min(N_max, length(history.t))  # to avoid BoundsError
+    traj = hcat(history.x...)
+    time_stamps = history.t[n_start:N_max]
+
+    if !xv_plot
+        if traj.size[1] == 1
+            p = Plots.plot!(p, time_stamps, traj[1,n_start:N_max], xlabel = show_axis ? L"t" : "", ylabel = show_axis ? L"x" : "", grid=show_grid, title = show_title ? title : "", label=false, color=color, background=background, linewidth=linewidth, xticks=show_axis, yticks=show_axis, legend=false; kwargs...)
+        elseif plot_type == "2D"
+            p = Plots.plot!(p, traj[1,n_start:N_max], traj[2,n_start:N_max], xlabel = show_axis ? L"x_1" : "", ylabel = show_axis ? L"x_2" : "", grid=show_grid, title = show_title ? title : "", label=false, color=color, background=background, linewidth=linewidth, xticks=show_axis, yticks=show_axis, legend=false; kwargs...)
+        else
+            p = Plots.plot!(p, traj[1,n_start:N_max], traj[2,n_start:N_max], traj[3,n_start:N_max], xlabel = show_axis ? L"x_1" : "", ylabel = show_axis ? L"x_2" : "", zlabel = show_axis ? L"x_3" : "", grid=show_grid, title = show_title ? title : "", label=false, color=color, background=background, linewidth=linewidth, xticks=show_axis, yticks=show_axis, zticks=show_axis, legend=false; kwargs...)
+        end
+    else
+        traj_v = hcat(history.v...)
+        p = Plots.plot!(p, traj[1,n_start:N_max], traj_v[1,n_start:N_max], grid=show_grid, title = show_title ? title : "", label=false, color=color, background=background, linewidth=linewidth, xticks=show_axis, yticks=show_axis, legend=false; kwargs...)
+    end
+
+    if !isnothing(filename)
+        filename = occursin(".", filename) ? filename : filename * ".svg"
+        savefig(p, filename)
+    end
+
+    return p
+end
+
+"""
+既存の plot に U の等高線を追加する関数
+
+# Arguments
+- `U`: ポテンシャル関数（2次元ベクトルを受け取る）
+- `x_range`: x方向の範囲（デフォルト: -5:0.1:5）
+- `y_range`: y方向の範囲（デフォルト: -5:0.1:5）
+- `levels`: 等高線のレベル数（デフォルト: 20）
+- `color`: カラーパレット（デフォルト: :viridis）
+- `fill`: 等高線を塗りつぶすかどうか（デフォルト: true）
+- `show_grid`: グリッドを表示するか（デフォルト: false）
+- `show_axis`: 軸の目盛りを表示するか（デフォルト: false）
+- `show_title`: タイトルを表示するか（デフォルト: false）
+- `xlabel`: x軸のラベル（デフォルト: L"x_1"）
+- `ylabel`: y軸のラベル（デフォルト: L"x_2"）
+- `background`: 背景色（デフォルト: :white）
+- `linewidth`: 等高線の線幅（デフォルト: 1）
+- `filename`: 保存するファイル名（デフォルト: nothing）
+"""
+function plot_U_contour(U;
+    x_range = range(-5, 5, length=100),
+    y_range = range(-5, 5, length=100),
+    levels = 20,
+    color = :viridis,
+    fill = true,
+    show_grid = false,
+    show_axis = false,
+    show_title = false,
+    xlabel = L"x_1",
+    ylabel = L"x_2",
+    background = :transparent,
+    linewidth = 1,
+    filename = nothing)
+    
+    # グリッド上でUの値を計算
+    Z = [U([x, y]) for x in x_range, y in y_range]
+    
+    # プロットを作成
+    p = contour(x_range, y_range, Z,
+        levels = levels,
+        color = color,
+        fill = fill,
+        linewidth = linewidth,
+        xlabel = show_axis ? xlabel : "",
+        ylabel = show_axis ? ylabel : "",
+        background = background,
+        grid = show_grid,
+        title = show_title ? L"Contour plot of $U(x)$" : "",
+        xticks = show_axis,
+        yticks = show_axis,
+        legend = false)
+
+    if !isnothing(filename)
+        filename = occursin(".", filename) ? filename : filename * ".svg"
         savefig(p, filename)
     end
 

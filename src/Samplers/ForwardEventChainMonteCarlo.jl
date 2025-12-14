@@ -165,6 +165,42 @@ function _velocity_jump_event_chain(x::Vector{Float64}, v::Vector{Float64},
     return v_out
 end
 
+function _velocity_jump_event_chain_speed_up(x::Vector{Float64}, v::Vector{Float64}, 
+    key::Random.AbstractRNG, ∇U::Function, 
+    dim::Int, mix_p::Float64, ran_p::Bool,
+    switch::Bool, positive::Bool, speed_factor::Float64)::Vector{Float64}
+
+    # Generate a new radial speed
+    u = rand(key)
+    ρ = speed_factor * -sqrt(1 - u^(2 / (dim - 1)))
+
+    # Compute normalized gradient direction
+    n = norm(∇U(x)) == 0 ? zeros(dim) : ∇U(x) ./ norm(∇U(x))
+
+    # Decompose velocity into parallel and orthogonal components
+    vₚ = (v ⋅ n) * n  # Parallel component along gradient
+    vₒ = v - vₚ       # Orthogonal component
+
+    # Handle degenerate case where orthogonal component is too small
+    if norm(vₒ) < TOLERANCE
+        vₒ = randn(key, dim)
+        vₒ = vₒ .- (vₒ ⋅ n) * n
+    end
+
+    u2 = rand(key)
+    if u2 >= mix_p
+        # No refresh case - return early
+        v_out = vₒ / norm(vₒ) * sqrt(speed_factor^2 - ρ^2) .+ ρ * n
+        return v_out
+    end
+
+    # Refresh case
+    vₒ_proposal = switch ? _orthogonal_switch(vₒ, n, key, ran_p, dim, positive) : _full_refresh(n, key, dim)
+    v_out = vₒ_proposal / norm(vₒ_proposal) * sqrt(speed_factor^2 - ρ^2) .+ ρ * n
+
+    return v_out
+end
+
 mutable struct ForwardECMC <: AbstractPDMP
   dim::Int
   ∇U::Function
@@ -185,6 +221,7 @@ mutable struct ForwardECMC <: AbstractPDMP
   switch::Bool  # orthogonal switch or full refresh for the orthogonal component
   mix_p::Float64  # Mixture probability for refreshment
   AD_backend::String
+  speed_factor::Float64
   # p::Int  # TODO: Number of components to be refreshed each time
 
   """
@@ -203,7 +240,8 @@ mutable struct ForwardECMC <: AbstractPDMP
   - `mix_p::Float64=0.5`: Mixture probability for refreshment
   """
   function ForwardECMC(dim::Int, ∇U::Function; grid_size::Int=10, tmax::Union{Float64, Int}=2.0,
-    signed_bound::Bool=true, adaptive::Bool=true, ran_p::Bool=false, mix_p::Float64=0.5, switch::Bool=true, positive::Bool=true, AD_backend::String="Undefined")
+    signed_bound::Bool=true, adaptive::Bool=true, ran_p::Bool=false, mix_p::Float64=0.5, switch::Bool=true, positive::Bool=true, AD_backend::String="Undefined",
+    speed_factor::Float64=1.0)
 
     # Input validation and preprocessing
     tmax = Float64(tmax)
@@ -225,9 +263,13 @@ mutable struct ForwardECMC <: AbstractPDMP
     # Create rate function closures
     rate = (x0, v0, t) -> _global_rate(x0, v0, t, ∇U, flow)
     signed_rate = (x0, v0, t) -> _signed_rate(x0, v0, t, ∇U, flow)
-    velocity_jump = (x, v, key) -> _velocity_jump_event_chain(x, v, key, ∇U, dim, mix_p, ran_p, switch, positive)
+    if speed_factor > 1.0
+        velocity_jump = (x, v, key) -> _velocity_jump_event_chain_speed_up(x, v, key, ∇U, dim, mix_p, ran_p, switch, positive, speed_factor)
+    else
+        velocity_jump = (x, v, key) -> _velocity_jump_event_chain(x, v, key, ∇U, dim, mix_p, ran_p, switch, positive)
+    end
 
-    new(dim, ∇U, grid_size, tmax, refresh_rate, vectorized_bound, signed_bound, adaptive, flow, rate, rate_vect, signed_rate, signed_rate_vect, velocity_jump, nothing, ran_p, switch, mix_p, AD_backend)
+    new(dim, ∇U, grid_size, tmax, refresh_rate, vectorized_bound, signed_bound, adaptive, flow, rate, rate_vect, signed_rate, signed_rate_vect, velocity_jump, nothing, ran_p, switch, mix_p, AD_backend, speed_factor)
   end
 end  # mutable struct ForwardECMC
 
@@ -297,12 +339,12 @@ Create ForwardECMC sampler with automatic differentiation.
 """
 function ForwardECMCAD(dim::Int, U::Function; grid_size::Int=10, tmax::Union{Float64, Int}=2.0,
     signed_bound::Bool=true, adaptive::Bool=true, AD_backend::String="Zygote",
-    ran_p::Bool=true, mix_p::Float64=0.5, switch::Bool=true, positive::Bool=true)
+    ran_p::Bool=true, mix_p::Float64=0.5, switch::Bool=true, positive::Bool=true, speed_factor::Float64=1.0)
     
     # Create gradient function using the helper function
     ∇U = create_gradient_function(U, dim, AD_backend)
     
     # Create and return sampler
     return ForwardECMC(dim, ∇U, grid_size=grid_size, tmax=tmax,
-                      signed_bound=signed_bound, adaptive=adaptive, ran_p=ran_p, mix_p=mix_p, switch=switch, positive=positive, AD_backend=AD_backend)
+                      signed_bound=signed_bound, adaptive=adaptive, ran_p=ran_p, mix_p=mix_p, switch=switch, positive=positive, AD_backend=AD_backend, speed_factor=speed_factor)
 end
