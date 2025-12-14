@@ -27,11 +27,11 @@ function plot_traj(history::PDMPHistory, N_max::Int; plot_type="2D", color="#78C
     n_start::Int=1, filename::Union{String, Nothing}=nothing, xv_plot = false, contour_plot = false, kwargs...)
 
     N_max = min(N_max, length(history.t))  # to avoid BoundsError
-    traj = hcat(history.x...)
+    traj = history.X
     time_stamps = history.t[n_start:N_max]
 
     if !xv_plot
-        if traj.size[1] == 1
+        if size(traj, 1) == 1
             p = Plots.plot(time_stamps, traj[1,n_start:N_max], xlabel = L"t", ylabel = L"x", title = title, label=false, color=color, background=background, linewidth=linewidth; kwargs...)
         elseif plot_type == "2D"
             p = Plots.plot(traj[1,n_start:N_max], traj[2,n_start:N_max], xlabel = L"x_1", ylabel = L"x_2", title = title, label=false, color=color, background=background, linewidth=linewidth; kwargs...)
@@ -39,7 +39,7 @@ function plot_traj(history::PDMPHistory, N_max::Int; plot_type="2D", color="#78C
             p = Plots.plot(traj[1,n_start:N_max], traj[2,n_start:N_max], traj[3,n_start:N_max], xlabel = L"x_1", ylabel = L"x_2", zlabel = L"x_3", title = title, label=false, color=color, background=background, linewidth=linewidth; kwargs...)
         end
     else
-        traj_v = hcat(history.v...)
+        traj_v = history.V
         p = Plots.plot(traj[1,n_start:N_max], traj_v[1,n_start:N_max], xlabel = L"x", ylabel = L"v", title = title, label=false, color=color, background=background, linewidth=linewidth; kwargs...)
     end
 
@@ -59,11 +59,11 @@ function plot_traj!(p, history::PDMPHistory, N_max::Int; plot_type="2D", color="
     kwargs...)
 
     N_max = min(N_max, length(history.t))  # to avoid BoundsError
-    traj = hcat(history.x...)
+    traj = history.X
     time_stamps = history.t[n_start:N_max]
 
     if !xv_plot
-        if traj.size[1] == 1
+        if size(traj, 1) == 1
             p = Plots.plot!(p, time_stamps, traj[1,n_start:N_max], xlabel = show_axis ? L"t" : "", ylabel = show_axis ? L"x" : "", grid=show_grid, title = show_title ? title : "", label=false, color=color, background=background, linewidth=linewidth, xticks=show_axis, yticks=show_axis, legend=false; kwargs...)
         elseif plot_type == "2D"
             p = Plots.plot!(p, traj[1,n_start:N_max], traj[2,n_start:N_max], xlabel = show_axis ? L"x_1" : "", ylabel = show_axis ? L"x_2" : "", grid=show_grid, title = show_title ? title : "", label=false, color=color, background=background, linewidth=linewidth, xticks=show_axis, yticks=show_axis, legend=false; kwargs...)
@@ -71,7 +71,7 @@ function plot_traj!(p, history::PDMPHistory, N_max::Int; plot_type="2D", color="
             p = Plots.plot!(p, traj[1,n_start:N_max], traj[2,n_start:N_max], traj[3,n_start:N_max], xlabel = show_axis ? L"x_1" : "", ylabel = show_axis ? L"x_2" : "", zlabel = show_axis ? L"x_3" : "", grid=show_grid, title = show_title ? title : "", label=false, color=color, background=background, linewidth=linewidth, xticks=show_axis, yticks=show_axis, zticks=show_axis, legend=false; kwargs...)
         end
     else
-        traj_v = hcat(history.v...)
+        traj_v = history.V
         p = Plots.plot!(p, traj[1,n_start:N_max], traj_v[1,n_start:N_max], grid=show_grid, title = show_title ? title : "", label=false, color=color, background=background, linewidth=linewidth, xticks=show_axis, yticks=show_axis, legend=false; kwargs...)
     end
 
@@ -155,7 +155,7 @@ function anim_traj(history::PDMPHistory, N_max::Int; N_start::Int=1, plot_start:
     N_max = min(N_max, length(history.t), frame_upper_limit)  # to avoid BoundsError
     time_stamps = history.t[N_start:N_max]
 
-    if length(history.x[1]) == 1 || plot_type == "1D"  # if dim = 1, horizontal axis is time
+    if size(history.X, 1) == 1 || plot_type == "1D"  # if dim = 1, horizontal axis is time
         traj, event_indeces, times = traj_for_animation(history, time_stamps, N_start, N_max; coordinate_numbers=coordinate_numbers[1], dt=dt, nonlinear_flow=nonlinear_flow)
         args = (
             xlims=(0, times[min(end, frame_upper_limit)]),
@@ -290,10 +290,10 @@ end
 function traj_for_animation(history::PDMPHistory, time_stamps::Vector{Float64}, N_start::Int, N_max::Int;
     coordinate_numbers=[1,2,3], dt::Float64=0.1, nonlinear_flow::Union{Function, Nothing}=nothing)
 
-    trajectory = hcat(history.x...)
+    trajectory = history.X
     traj = trajectory[coordinate_numbers, N_start:N_max]
     traj = isa(traj, Vector) ? reshape(traj, 1, :) : traj
-    v_history = hcat(history.v...)[coordinate_numbers, N_start:N_max]  # not used if nonlinear_flow = nothing
+    v_history = history.V[coordinate_numbers, N_start:N_max]  # not used if nonlinear_flow = nothing
     x, event_indeces, t = [], [], []
 
     for (xₙ, tₙ, n) in zip(eachcol(traj), time_stamps, 1:N_max-N_start+1)

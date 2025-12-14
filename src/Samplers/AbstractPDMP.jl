@@ -65,14 +65,15 @@ abstract type AbstractPDMP end
     Returns:
         PDMPState: The initialized PDMP state.
 """
-function init_state(pdmp::AbstractPDMP, xinit::Array{Float64}, vinit::Array{Float64}, seed::Union{Int, Nothing}=nothing)
+function init_state(pdmp::AbstractPDMP, xinit::AbstractVector{Float64}, vinit::AbstractVector{Float64}, seed::Union{Int, Nothing}=nothing)
 
     # xinit と vinit の次元が pdmp.dim に一致するか確認
     if length(xinit) != pdmp.dim || length(vinit) != pdmp.dim
         throw(DimensionMismatch("xinit と vinit の次元は pdmp.dim ($(pdmp.dim)) と一致する必要があります。現在の次元: xinit ($(length(xinit))), vinit ($(length(vinit)))"))
     end
 
-    key = Random.seed!(seed)
+    rng = seed === nothing ? Random.default_rng() : Random.MersenneTwister(seed)
+    pdmp.rng = rng
 
     # rate, rate_vect, refresh_rate の設定は signed_bound に依存して異なる
     if pdmp.signed_bound
@@ -86,7 +87,7 @@ function init_state(pdmp::AbstractPDMP, xinit::Array{Float64}, vinit::Array{Floa
     end
 
     if pdmp.grid_size < 0
-        throw(ArgumentError("grid_size must be non-negative. Current value: $grid_size"))
+        throw(ArgumentError("grid_size must be non-negative. Current value: $(pdmp.grid_size)"))
     end
 
     # グリッドサイズが0の場合、Brentのアルゴリズムを使用して定数上限戦略を使用
@@ -115,11 +116,6 @@ function init_state(pdmp::AbstractPDMP, xinit::Array{Float64}, vinit::Array{Floa
         vinit,
         0.0,
         pdmp.tmax,
-        key,
-        pdmp.flow,
-        pdmp.∇U,
-        pdmp.rate,
-        pdmp.velocity_jump,
         upper_bound_func,
         boundox,
         pdmp.adaptive

@@ -57,8 +57,8 @@ using PDMPFlux
         sampler_flat = ZigZagAD(1, U_Flat, grid_size=0)
         output_flat = sample_skeleton(sampler_flat, 100, 0.0, 1.0, seed=42)
         @test all(isfinite.(output_flat.t))
-        @test all(isfinite.(output_flat.x))
-        @test all(isfinite.(output_flat.v))
+        @test all(isfinite.(hcat(output_flat.x...)))
+        @test all(isfinite.(hcat(output_flat.v...)))
     end
     
     @testset "Memory and Performance Limits" begin

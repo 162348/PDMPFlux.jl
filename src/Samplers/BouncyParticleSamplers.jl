@@ -13,6 +13,7 @@ mutable struct BPS <: AbstractPDMP
   signed_rate::Function
   signed_rate_vect::Union{Function, Nothing}
   velocity_jump::Function
+  rng::AbstractRNG
   state::Any
 
 # Constructor for BouncyParticle
@@ -65,7 +66,7 @@ mutable struct BPS <: AbstractPDMP
     end
 
     return new(dim, ∇U, grid_size, tmax, refresh_rate, vectorized_bound, signed_bound, adaptive,
-                          flow, rate, rate_vect, signed_rate, signed_rate_vect, velocity_jump, nothing)
+                          flow, rate, rate_vect, signed_rate, signed_rate_vect, velocity_jump, Random.default_rng(), nothing)
   end
 
 end  # mutable struct BPS

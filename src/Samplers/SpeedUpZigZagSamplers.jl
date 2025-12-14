@@ -47,6 +47,7 @@ mutable struct SpeedUpZigZag <: AbstractPDMP
     signed_rate::Union{Function, Nothing}
     signed_rate_vect::Function
     velocity_jump::Function
+    rng::AbstractRNG
     state::Any
 
     """
@@ -83,12 +84,12 @@ mutable struct SpeedUpZigZag <: AbstractPDMP
         # Define rate functions
         rate = function _global_rate(x0, v0, t)
             xt, vt = flow(x0, v0, t)
-            return sum(max.(zeros(dim), ∇U_effective(xt) .* vt))
+            return sum(max.(0.0, ∇U_effective(xt) .* vt))
         end
     
         rate_vect = function _global_rate_vectorized(x0, v0, t)
             xt, vt = flow(x0, v0, t)
-            return max.(zeros(dim), ∇U_effective(xt) .* vt)
+            return max.(0.0, ∇U_effective(xt) .* vt)
         end
     
         signed_rate = nothing
@@ -100,15 +101,38 @@ mutable struct SpeedUpZigZag <: AbstractPDMP
 
         # Define velocity jump function
         function velocity_jump(x, v, rng)
-            lambda_t = max.(zeros(dim), ∇U_effective(x) .* v)
-            p = lambda_t ./ sum(lambda_t)
-            m = rand(rng, Categorical(p))
+            g = ∇U_effective(x)
+            total = 0.0
+            @inbounds for i in 1:dim
+                λ = g[i] * v[i]
+                if λ > 0.0
+                    total += λ
+                end
+            end
+
+            if total == 0.0
+                return v
+            end
+
+            u = rand(rng) * total
+            acc = 0.0
+            m = 1
+            @inbounds for i in 1:dim
+                λ = g[i] * v[i]
+                if λ > 0.0
+                    acc += λ
+                    if acc >= u
+                        m = i
+                        break
+                    end
+                end
+            end
             v[m] *= -1
             return v
         end
 
-        new(dim, ∇U, grid_size, tmax, refresh_rate, vectorized_bound, signed_bound, adaptive, 
-            flow, rate, rate_vect, signed_rate, signed_rate_vect, velocity_jump, nothing)
+        new(dim, ∇U, grid_size, tmax, refresh_rate, vectorized_bound, signed_bound, adaptive,
+            flow, rate, rate_vect, signed_rate, signed_rate_vect, velocity_jump, Random.default_rng(), nothing)
     end
 end
 

@@ -77,14 +77,22 @@ function sample_skeleton(
     verbose::Bool=true
 )::PDMPHistory
 
-    iter = verbose ? ProgressBar(1:n_sk, unit="B", unit_scale=true) : 1:n_sk
+    if n_sk <= 0
+        throw(ArgumentError("n_sk must be positive. Current value: $n_sk"))
+    end
+
+    d = length(xinit)
+    # CI/テスト環境では進捗バーが warning を出すことがあるので、対話環境のみ有効化する
+    iter = (verbose && isinteractive()) ? ProgressBar(1:n_sk, unit="B", unit_scale=true) : 1:n_sk
 
     state = init_state(sampler, xinit, vinit, seed)  # initializing sampler
-    history = PDMPHistory(state)  # initialize history
+    history = PDMPHistory(d, n_sk)  # initialize history
+    record!(history, 1, state, d)
     
-    for _ in iter
-        state = get_event_state(state, sampler)  # go to SamplingLoop.jl or StickySamplingLoop.jl
-        push!(history, state)
+    # 1列目は初期状態で埋めたので 2 から記録する
+    for k in Base.Iterators.drop(iter, 1)
+        state = get_event_state!(state, sampler)  # go to SamplingLoop.jl or StickySamplingLoop.jl
+        record!(history, k, state, d)
     end
     sampler.state = state
 
@@ -99,9 +107,13 @@ function sample_skeleton(
     N::Int,
     xinit::Union{Float64, Int},
     vinit::Union{Float64, Int};
-    seed::Int=nothing,
+    seed::Union{Int, Nothing}=nothing,
     verbose::Bool=true
 )::PDMPHistory
+
+    if N <= 0
+        throw(ArgumentError("n_sk must be positive. Current value: $N"))
+    end
 
     # NaN/Inf値の検証を追加
     if !isfinite(xinit) || !isfinite(vinit)
@@ -125,16 +137,91 @@ end
         Array{Float64, 2}: The sampled points from the PDMP trajectory skeleton.
     """
 function sample_from_skeleton(sampler::AbstractPDMP, N::Int, history::PDMPHistory; discard_vt = true)::Matrix{Float64}
-    x, v, t = history.x, history.v, history.t
-    tm = (t[end] / N) .* collect(1:N)  # equidistant time points
-    indeces = searchsortedfirst.(Ref(t), tm) .- 1  # previous index
-    samples = map(tuple -> sampler.flow(x[tuple[1]], v[tuple[1]] .* history.is_active[tuple[1]], tm[tuple[2]] - t[tuple[1]])[1], zip(indeces, 1:N))  # flow を通じて位置を取得
-    if discard_vt
-        return hcat(samples...)
-    else 
-        samples_v = map(tuple -> sampler.flow(x[tuple[1]], v[tuple[1]] .* history.is_active[tuple[1]], tm[tuple[2]] - t[tuple[1]])[2], zip(indeces, 1:N))  # flow を通じて位置を取得
-        return vcat(hcat(samples...), hcat(samples_v...), hcat(tm)')
+    if N <= 0
+        throw(ArgumentError("N must be positive. Current value: $N"))
     end
+
+    X = history.X
+    V = history.V
+    t = history.t
+    t_end = t[end]
+    dt = t_end / N
+
+    d = size(X, 1)
+    out = discard_vt ? Matrix{Float64}(undef, d, N) : Matrix{Float64}(undef, 2d + 1, N)
+
+    i = 1
+    Nh = length(t)
+    @inbounds for j in 1:N
+        tm = j * dt
+        while i < Nh && t[i+1] <= tm
+            i += 1
+        end
+
+        τ = tm - t[i]
+        x0 = @view X[:, i]
+        v0 = @view V[:, i]
+
+        if discard_vt
+            x_new, _v_new = sampler.flow(x0, v0, τ)
+            out[1:d, j] = x_new
+        else
+            x_new, v_new = sampler.flow(x0, v0, τ)
+            out[1:d, j] = x_new
+            out[d+1:2d, j] = v_new
+            out[2d+1, j] = tm
+        end
+    end
+
+    return out
+end
+
+# Sticky samplers need to respect `is_active` in the reconstructed velocity.
+function sample_from_skeleton(sampler::StickyPDMP, N::Int, history::PDMPHistory; discard_vt = true)::Matrix{Float64}
+    if N <= 0
+        throw(ArgumentError("N must be positive. Current value: $N"))
+    end
+
+    X = history.X
+    V = history.V
+    t = history.t
+    active = history.is_active
+    t_end = t[end]
+    dt = t_end / N
+
+    d = size(X, 1)
+    out = discard_vt ? Matrix{Float64}(undef, d, N) : Matrix{Float64}(undef, 2d + 1, N)
+
+    v_used = Vector{Float64}(undef, d)
+    i = 1
+    Nh = length(t)
+
+    @inbounds for j in 1:N
+        tm = j * dt
+        while i < Nh && t[i+1] <= tm
+            i += 1
+        end
+
+        τ = tm - t[i]
+        x0 = @view X[:, i]
+        v0 = @view V[:, i]
+
+        @inbounds @simd for k in 1:d
+            v_used[k] = active[k, i] ? v0[k] : 0.0
+        end
+
+        if discard_vt
+            x_new, _v_new = sampler.flow(x0, v_used, τ)
+            out[1:d, j] = x_new
+        else
+            x_new, v_new = sampler.flow(x0, v_used, τ)
+            out[1:d, j] = x_new
+            out[d+1:2d, j] = v_new
+            out[2d+1, j] = tm
+        end
+    end
+
+    return out
 end
 
 """
@@ -173,15 +260,15 @@ function _sample_from_skeleton_impl(
     discard_vt::Bool,
     use_active::Bool,
 )
-    xhist = history.x
-    vhist = history.v
+    xhist = history.X
+    vhist = history.V
     thist = history.t
     active = history.is_active
 
     T_end = thist[end]
     n_skel = Int(floor(T_end / dt))
 
-    d = length(xhist[1])
+    d = size(xhist, 1)
 
     if discard_vt
         out = Matrix{Float64}(undef, d, n_skel)
@@ -191,6 +278,7 @@ function _sample_from_skeleton_impl(
 
     i = 1
     N = length(thist)
+    v_used = use_active ? Vector{Float64}(undef, d) : Vector{Float64}(undef, 0)
 
     @inbounds for j in 1:n_skel
         t = j * dt
@@ -199,11 +287,14 @@ function _sample_from_skeleton_impl(
         end
 
         τ  = t - thist[i]
-        x0 = xhist[i]
-        v0 = vhist[i]
+        @views x0 = xhist[:, i]
+        @views v0 = vhist[:, i]
 
         if use_active
-            x_new, v_new = sampler.flow(x0, v0 .* active[i], τ)
+            @inbounds @simd for k in 1:d
+                v_used[k] = active[k, i] ? v0[k] : 0.0
+            end
+            x_new, v_new = sampler.flow(x0, v_used, τ)
         else
             x_new, v_new = sampler.flow(x0, v0, τ)
         end
@@ -220,17 +311,38 @@ end
 
 
 function sample_from_skeleton(sampler::AbstractPDMP, N::Int, dt::Float64, history::PDMPHistory; discard_vt = true)::Matrix{Float64}
-    x, v, t = history.x[1:N], history.v[1:N], history.t[1:N]
-    tm = dt:dt:t[end]  # equidistant time points
-    N = length(tm)
-    indeces = searchsortedfirst.(Ref(t), tm) .- 1  # previous index
-    samples = map(tuple -> sampler.flow(x[tuple[1]], v[tuple[1]] .* history.is_active[tuple[1]], tm[tuple[2]] - t[tuple[1]])[1], zip(indeces, 1:N))  # flow を通じて位置を取得
-    if discard_vt
-        return hcat(samples...)
-    else 
-        samples_v = map(tuple -> sampler.flow(x[tuple[1]], v[tuple[1]] .* history.is_active[tuple[1]], tm[tuple[2]] - t[tuple[1]])[2], zip(indeces, 1:N))  # flow を通じて位置を取得
-        return vcat(hcat(samples...), hcat(samples_v...), hcat(tm)')
+    X = @view history.X[:, 1:N]
+    V = @view history.V[:, 1:N]
+    t = @view history.t[1:N]
+    active = @view history.is_active[:, 1:N]
+
+    tm = collect(dt:dt:t[end])  # equidistant time points
+    M = length(tm)
+    indices = searchsortedfirst.(Ref(t), tm) .- 1  # previous index
+
+    d = size(X, 1)
+    out = discard_vt ? Matrix{Float64}(undef, d, M) : Matrix{Float64}(undef, 2d + 1, M)
+
+    @inbounds for j in 1:M
+        i = indices[j]
+        i = i < 1 ? 1 : i
+        τ = tm[j] - t[i]
+
+        @views x0 = X[:, i]
+        @views v0 = V[:, i]
+
+        if discard_vt
+            x_new = sampler.flow(x0, v0 .* active[:, i], τ)[1]
+            out[1:d, j] = x_new
+        else
+            x_new, v_new = sampler.flow(x0, v0 .* active[:, i], τ)
+            out[1:d, j] = x_new
+            out[d+1:2d, j] = v_new
+            out[2d+1, j] = tm[j]
+        end
     end
+
+    return out
 end
 
 function previous_indices(thist::Vector{Float64}, tm::Vector{Float64})

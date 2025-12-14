@@ -1,4 +1,5 @@
 using Random
+using StaticArrays
 
 """
     BoundBox <: Any
@@ -25,15 +26,11 @@ end
     AbstractPDMP の状態空間の元．次のフィールドを持つ構造体として実装：
 
     Attributes:
-        x (Array{Float64, 1}): position
-        v (Array{Float64, 1}): velocity
+        x (AbstractVector{T}): position
+        v (AbstractVector{T}): velocity
         t (Float64): time
-        is_active (Array{Bool, 1}): indicator for the freezing state. Used in the sampling loop for Sticky samplers.
+        is_active (AbstractVector{Bool}): indicator for the freezing state. Used in the sampling loop for Sticky samplers.
 
-        ∇U (Function): gradient of the potential function
-        rate (Function): rate function
-        flow (Function): flow function
-        velocity_jump (Function): velocity jump function
         upper_bound_func (Function): upper bound function
         upper_bound (Union{Nothing, NamedTuple}): upper bound box
 
@@ -55,143 +52,158 @@ end
         rejected (Int): count of the number of rejections in the thinning
         hitting_horizon (Int): count of the number of hits of the horizon
         
-        key (Any): random key
+    Note:
+        `flow/∇U/rate/velocity_jump/rng` は sampler 側に持たせ，state は「状態」(x,v,t,...) に集中させる．
 """
-mutable struct PDMPState <: Any
-    x::Array{Float64}
-    v::Array{Float64}
-    t::Float64
-    is_active::Array{Bool}
-    horizon::Float64
-    key::AbstractRNG
-    flow::Function
-    ∇U::Function
-    rate::Function
-    velocity_jump::Function
-    upper_bound_func::Function
+mutable struct PDMPState{T,TX<:AbstractVector{T},TV<:AbstractVector{T},TA<:AbstractVector{Bool},TF} <: Any
+    x::TX
+    v::TV
+    v_active::TV   # scratch buffer: v .* is_active (no allocations)
+    t::T
+    is_active::TA
+    horizon::T
+    upper_bound_func::TF
     accept::Bool
     upper_bound::Union{Nothing, BoundBox}
-    tp::Float64  # time proposed
-    ts::Float64  # time spent
-    tt::Float64  # time proposed to thaw one coordinate
+    tp::T  # time proposed
+    ts::T  # time spent
+    tt::T  # time proposed to thaw one coordinate
     # They are used in `SamplingLoop.jl` to conduct poisson thinning, where `tp` is the proposed jump time, and is added to `ts` when rejected.
-    exp_rv::Float64  # to store an exponential random variable
-    lambda_bar::Float64  # upper bound for the rate function, calculated from `BoundBox`
-    lambda_t::Float64
-    ar::Float64  # acceptance rate
+    exp_rv::T  # to store an exponential random variable
+    lambda_bar::T  # upper bound for the rate function, calculated from `BoundBox`
+    lambda_t::T
+    ar::T  # acceptance rate
     errored_bound::Int  # 代理上界で足りなかった回数
-    error_value_ar::Vector{Float64}  #? jax の実装に引っ張られすぎ？
+    error_value_ar::MVector{5,T}  # fixed-length ring buffer of recent erroneous ARs
     rejected::Int
     hitting_horizon::Int  # the total times of hitting the horizon
     adaptive::Bool
     stick_or_thaw_event::Bool  # indicator for the sticking or thawing event
 end
 
-function PDMPState(x::Vector{Float64}, v::Vector{Float64}, t::Float64, horizon::Float64, key::AbstractRNG,
-    flow::Function, ∇U::Function, rate::Function, velocity_jump::Function, upper_bound_func::Function,
-    upper_bound::Union{Nothing, BoundBox}, adaptive::Bool)
-    is_active = fill(true, length(x))
+
+function PDMPState(
+    x::AbstractVector{T},
+    v::AbstractVector{T},
+    t::T,
+    horizon::T,
+    upper_bound_func,
+    upper_bound::Union{Nothing, BoundBox},
+    adaptive::Bool,
+) where {T<:AbstractFloat}
+    is_active = trues(length(x))          # BitVector
+    v_active = similar(v)                # same concrete array type as v
     accept = false
-    tp = 0.0
-    ts = 0.0
-    tt = Inf
-    exp_rv = 0.0
-    lambda_bar = 0.0
-    lambda_t = 0.0
-    ar = 0.0
+    tp = zero(T)
+    ts = zero(T)
+    tt = T(Inf)
+    exp_rv = zero(T)
+    lambda_bar = zero(T)
+    lambda_t = zero(T)
+    ar = zero(T)
     errored_bound = 0
-    error_value_ar = zeros(5)
+    error_value_ar = MVector{5,T}(undef)
+    fill!(error_value_ar, zero(T))
     rejected = 0
     hitting_horizon = 0
     stick_or_thaw_event = false
-    return PDMPState(x, v, t, is_active, horizon, key, flow, ∇U, rate, velocity_jump, upper_bound_func, accept, upper_bound, tp, ts, tt, exp_rv, lambda_bar, lambda_t, ar, errored_bound, error_value_ar, rejected, hitting_horizon, adaptive, stick_or_thaw_event)
+    return PDMPState(
+        x,
+        v,
+        v_active,
+        t,
+        is_active,
+        horizon,
+        upper_bound_func,
+        accept,
+        upper_bound,
+        tp,
+        ts,
+        tt,
+        exp_rv,
+        lambda_bar,
+        lambda_t,
+        ar,
+        errored_bound,
+        error_value_ar,
+        rejected,
+        hitting_horizon,
+        adaptive,
+        stick_or_thaw_event,
+    )
 end
 
 
-
-
-# """
-#     PDMPOutput <: Any
-
-#     PDMP 実行後の出力を格納するための構造体．
-
-#     Attributes:
-#         x (Array{Float64, 1}): The state trajectory.
-#         v (Array{Float64, 1}): The velocity trajectory.
-#         t (Array{Float64, 1}): The time points at which the state and velocity are recorded.
-#         errored_bound (Array{Int64, 1}): The error bound at each time point.
-#         error_value_ar (Array{Float64, 1}): The error values at each time point.
-#         rejected (Array{Int64, 1}): The indicator of whether a jump was rejected at each time point.
-#         hitting_horizon (Array{Int64, 1}): The indicator of whether the process hit the horizon at each time point.
-#         ar (Array{Float64, 1}): Acceptance rate at each time point.
-#         horizon (Array{Float64, 1}): Horizon values.
-# """
-# struct PDMPOutput <: Any
-#     x::Vector{Float64}
-#     v::Vector{Float64}
-#     t::Float64
-    
-#     horizon::Float64
-#     ar::Float64
-#     errored_bound::Float64
-#     error_value_ar::Float64
-#     rejected::Float64
-#     hitting_horizon::Float64
-# end
-
-# """
-#     Converts the given PDMPState object into a PDMPOutput object by selecting the relevant fields.
-
-#     Args:
-#         state (NamedTuple): The PdmpState object to convert.
-
-#     Returns:
-#         NamedTuple: The converted PDMPOutput object.
-# """
-# function PDMPOutput(state::PDMPState)::PDMPOutput
-#     keys = fieldnames(PDMPOutput)
-#     values = [getfield(state, key) for key in keys]
-#     return PDMPOutput(values...)
-# end
-
-mutable struct PDMPHistory <: Any
-    x::Vector{Vector{Float64}}
-    v::Vector{Vector{Float64}}
-    t::Vector{Float64}
-    is_active::Vector{Vector{Bool}}
-
-    horizon::Vector{Float64}
-    ar::Vector{Float64}
-    errored_bound::Vector{Int}
-    error_value_ar::Vector{Vector{Float64}}
-    rejected::Vector{Int}
-    hitting_horizon::Vector{Int}
+struct PDMPHistory{T}
+    X::Matrix{T}              # d × n
+    V::Matrix{T}              # d × n
+    t::Vector{T}              # n
+    is_active::BitMatrix      # d × n（メモリ最小。速度優先なら Matrix{Bool} でもOK）
+    horizon::Vector{T}        # n（一定なら scalar 化も可）
+    ar::Vector{T}             # n
+    errored_bound::Vector{Int32}
+    error_value_ar::Matrix{T} # 5 × n
+    rejected::Vector{Int32}
+    hitting_horizon::Vector{Int32}
 end
 
-"""
-    最初の PDMPState オブジェクトから，PDMPHistory オブジェクトを生成するコンストラクタのディスパッチ
-"""
+function PDMPHistory(d::Int, n::Int; T=Float64)
+    PDMPHistory{T}(
+        Matrix{T}(undef, d, n),
+        Matrix{T}(undef, d, n),
+        Vector{T}(undef, n),
+        BitMatrix(undef, d, n),
+        Vector{T}(undef, n),
+        Vector{T}(undef, n),
+        Vector{Int32}(undef, n),
+        Matrix{T}(undef, 5, n),
+        Vector{Int32}(undef, n),
+        Vector{Int32}(undef, n),
+    )
+end
 
-function PDMPHistory(init_state::PDMPState)::PDMPHistory
-    keys = fieldnames(PDMPHistory)
-    values = [[deepcopy(getfield(init_state, key))] for key in keys]
-    return PDMPHistory(values...)
+# Backward-compatible constructor (older code created history from a state)
+function PDMPHistory(s::PDMPState)
+    d = length(s.x)
+    h = PDMPHistory(d, 1)
+    record!(h, 1, s, d)
+    return h
+end
+
+# Backward-compatible properties: expose `.x` / `.v` as column iterators
+function Base.getproperty(h::PDMPHistory, name::Symbol)
+    if name === :x
+        # テストやユーザコードが `Vector{Float64}`（copy）を期待するので view を返さない
+        return map(copy, eachcol(getfield(h, :X)))
+    elseif name === :v
+        return map(copy, eachcol(getfield(h, :V)))
+    else
+        return getfield(h, name)
+    end
 end
 
 """
     PDMPHistory オブジェクトに PDMPState オブジェクトから必要なフィールドを追記するメソッド
 """
-# function push!(history::PDMPHistory, output::PDMPOutput)::PDMPHistory
-#     keys = fieldnames(PDMPHistory)
-#     for key in keys
-#         push!(getfield(history, key), getfield(output, key))
-#     end
-#     return history
-# end
-function push!(history::PDMPHistory, state::PDMPState)::PDMPHistory
-    keys = fieldnames(PDMPHistory)
-    for key in keys
-        Base.push!(getfield(history, key), copy(getfield(state, key)))  # なぜか Base. が必要．
+@inline function record!(h::PDMPHistory{T}, k::Int, s::PDMPState, d::Int) where {T}
+    # X, V は列メジャーなのでオフセットで一気に copyto!
+    off = (k-1)*d + 1
+    @inbounds begin
+        copyto!(h.X, off, s.x, 1, d)
+        copyto!(h.V, off, s.v, 1, d)
+        h.t[k] = s.t
+        h.horizon[k] = s.horizon
+        h.ar[k] = s.ar
+        h.errored_bound[k] = Int32(s.errored_bound)
+        # error_value_ar は長さ5固定にしておく（後述）
+        for j in 1:5
+            h.error_value_ar[j, k] = s.error_value_ar[j]
+        end
+        h.rejected[k] = Int32(s.rejected)
+        h.hitting_horizon[k] = Int32(s.hitting_horizon)
+        for i in 1:d
+            h.is_active[i, k] = s.is_active[i]
+        end
     end
-    return history
+    return nothing
 end
