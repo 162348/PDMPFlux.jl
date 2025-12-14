@@ -97,7 +97,7 @@ using Random
         # 基本的なエラーハンドリング
         # 注意: 実際のエラーハンドリングは実装によって異なる場合があります
         @test_nowarn ZigZagAD(1, U_Gauss_1D, grid_size=0)
-        @test_nowarn sample_skeleton(ZigZagAD(1, U_Gauss_1D, grid_size=0), 10, 0.0, 1.0, seed=42)
+        @test_nowarn sample_skeleton(ZigZagAD(1, U_Gauss_1D, grid_size=0), 10, 0.0, 1.0, seed=42, verbose=false)
     end
     
     @testset "Reproducibility" begin

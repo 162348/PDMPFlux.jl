@@ -139,7 +139,13 @@ function _velocity_jump_event_chain(x::Vector{Float64}, v::Vector{Float64},
     ρ = -sqrt(1 - u^(2 / (dim - 1)))
     
     # Compute normalized gradient direction
-    n = norm(∇U(x)) == 0 ? zeros(dim) : ∇U(x) ./ norm(∇U(x))
+    n = ∇U(x)
+    ng = norm(n)
+    if ng == 0
+        fill!(n, 0.0)
+    else
+        n ./= ng
+    end
     
     # Decompose velocity into parallel and orthogonal components
     vₚ = (v ⋅ n) * n  # Parallel component along gradient
@@ -175,7 +181,13 @@ function _velocity_jump_event_chain_speed_up(x::Vector{Float64}, v::Vector{Float
     ρ = speed_factor * -sqrt(1 - u^(2 / (dim - 1)))
 
     # Compute normalized gradient direction
-    n = norm(∇U(x)) == 0 ? zeros(dim) : ∇U(x) ./ norm(∇U(x))
+    n = ∇U(x)
+    ng = norm(n)
+    if ng == 0
+        fill!(n, 0.0)
+    else
+        n ./= ng
+    end
 
     # Decompose velocity into parallel and orthogonal components
     vₚ = (v ⋅ n) * n  # Parallel component along gradient
@@ -216,6 +228,7 @@ mutable struct ForwardECMC <: AbstractPDMP
   signed_rate::Union{Function, Nothing}
   signed_rate_vect::Union{Function, Nothing}
   velocity_jump::Function
+  rng::AbstractRNG
   state::Union{PDMPState, Nothing}
   ran_p::Bool  # Whether to use ran-p-orthogonal refresh or orthogonal switch
   switch::Bool  # orthogonal switch or full refresh for the orthogonal component
@@ -269,7 +282,7 @@ mutable struct ForwardECMC <: AbstractPDMP
         velocity_jump = (x, v, key) -> _velocity_jump_event_chain(x, v, key, ∇U, dim, mix_p, ran_p, switch, positive)
     end
 
-    new(dim, ∇U, grid_size, tmax, refresh_rate, vectorized_bound, signed_bound, adaptive, flow, rate, rate_vect, signed_rate, signed_rate_vect, velocity_jump, nothing, ran_p, switch, mix_p, AD_backend, speed_factor)
+    new(dim, ∇U, grid_size, tmax, refresh_rate, vectorized_bound, signed_bound, adaptive, flow, rate, rate_vect, signed_rate, signed_rate_vect, velocity_jump, Random.default_rng(), nothing, ran_p, switch, mix_p, AD_backend, speed_factor)
   end
 end  # mutable struct ForwardECMC
 

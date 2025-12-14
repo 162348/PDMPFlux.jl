@@ -17,6 +17,7 @@ include("Samplers/StickyZigZagSamplers.jl")
 
 export ZigZag, ZigZagAD, BPS, BPSAD, ForwardECMC, ForwardECMCAD, StickyZigZag, StickyZigZagAD, Boomerang, BoomerangAD, SpeedUpZigZag, SpeedUpZigZagAD
 
+include("SamplingLoopInplace.jl")
 include("SamplingLoop.jl")
 include("StickySamplingLoop.jl")
 include("sample.jl")
