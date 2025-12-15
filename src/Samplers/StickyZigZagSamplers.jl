@@ -34,9 +34,9 @@ using Distributions
 - `velocity_jump::Function`: 速度ジャンプ関数．
 - `state`: ZigZagサンプラーの状態．
 """
-mutable struct StickyZigZag <: StickyPDMP
+mutable struct StickyZigZag{G,KF,KR,KRV,KSR,KSRV,KVJ} <: StickyPDMP
     dim::Int
-    ∇U::Function
+    ∇U::G
     κ::Vector{Float64}
 
     refresh_rate::Float64
@@ -45,20 +45,21 @@ mutable struct StickyZigZag <: StickyPDMP
     vectorized_bound::Bool
     signed_bound::Bool
     adaptive::Bool
-    flow::Function
-    rate::Function
-    rate_vect::Function
-    signed_rate::Union{Function, Nothing}
-    signed_rate_vect::Function
-    velocity_jump::Function
+    flow::KF
+    rate::KR
+    rate_vect::KRV
+    signed_rate::KSR
+    signed_rate_vect::KSRV
+    velocity_jump::KVJ
     rng::AbstractRNG
     state::Any
+    AD_backend::String
 
     """
     Constructor for ZigZag sampler
     """
-    function StickyZigZag(dim::Int, ∇U::Function, κ::Vector{Float64}; refresh_rate::Float64=0.0, grid_size::Int=10, tmax::Union{Float64, Int}=2.0, 
-                    vectorized_bound::Bool=true, signed_bound::Bool=true, adaptive::Bool=true)
+    function StickyZigZag(dim::Int, ∇U, κ::Vector{Float64}; refresh_rate::Float64=0.0, grid_size::Int=10, tmax::Union{Float64, Int}=2.0, 
+                    vectorized_bound::Bool=true, signed_bound::Bool=true, adaptive::Bool=true, AD_backend::String="FiniteDiff")
         
         tmax = Float64(tmax)  # convert tmax to Float64
 
@@ -94,38 +95,19 @@ mutable struct StickyZigZag <: StickyPDMP
 
         # Define velocity jump function
         function velocity_jump(x, v, key)
-            g = ∇U(x)
-            total = 0.0
-            @inbounds for i in 1:dim
-                λ = g[i] * v[i]
-                if λ > 0.0
-                    total += λ
-                end
-            end
-
-            if total == 0.0
-                return v
-            end
-
-            u = rand(key) * total
-            acc = 0.0
-            m = 1
-            @inbounds for i in 1:dim
-                λ = g[i] * v[i]
-                if λ > 0.0
-                    acc += λ
-                    if acc >= u
-                        m = i
-                        break
-                    end
-                end
-            end
+            lambda_t = max.(0.0, ∇U(x) .* v)
+            p = lambda_t ./ sum(lambda_t)
+            m = rand(key, Categorical(p))
             v[m] *= -1
             return v
         end
 
-        new(dim, ∇U, κ, refresh_rate, grid_size, tmax, vectorized_bound, signed_bound, adaptive,
-            flow, rate, rate_vect, signed_rate, signed_rate_vect, velocity_jump, Random.default_rng(), nothing)
+        rng = Random.default_rng()
+        state = nothing
+        return new{typeof(∇U), typeof(flow), typeof(rate), typeof(rate_vect), typeof(signed_rate), typeof(signed_rate_vect),
+                   typeof(velocity_jump)}(
+            dim, ∇U, κ, refresh_rate, grid_size, tmax, vectorized_bound, signed_bound, adaptive,
+            flow, rate, rate_vect, signed_rate, signed_rate_vect, velocity_jump, rng, state, AD_backend)
     end
 end
 
@@ -138,6 +120,6 @@ function StickyZigZagAD(dim::Int, U::Function, κ::Vector{Float64}; refresh_rate
     ∇U = set_AD_backend(AD_backend, U, dim)
 
     return StickyZigZag(dim, ∇U, κ, refresh_rate=refresh_rate, grid_size=grid_size, tmax=tmax,
-            vectorized_bound=vectorized_bound, signed_bound=signed_bound, adaptive=adaptive)
+            vectorized_bound=vectorized_bound, signed_bound=signed_bound, adaptive=adaptive, AD_backend=AD_backend)
 end
 
