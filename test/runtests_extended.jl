@@ -8,6 +8,9 @@ using Statistics
 # テスト用のシードを設定
 Random.seed!(42)
 
+# Quality assurance checks (Aqua.jl)
+include("test_aqua.jl")
+
 # 基本テスト
 include("test_utils.jl")
 include("test_samplers.jl")
