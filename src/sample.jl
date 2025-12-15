@@ -91,7 +91,9 @@ function sample_skeleton(
     
     # 1列目は初期状態で埋めたので 2 から記録する
     for k in Base.Iterators.drop(iter, 1)
-        state = get_event_state!(state, sampler)  # go to SamplingLoop.jl or StickySamplingLoop.jl
+        # StickyPDMP は `get_event_state(::PDMPState, ::StickyPDMP)` に別実装があるため、
+        # ここでは public API の non-`!` 版を呼んで multiple dispatch させる。
+        state = get_event_state(state, sampler)  # go to SamplingLoop.jl or StickySamplingLoop.jl
         record!(history, k, state, d)
     end
     sampler.state = state

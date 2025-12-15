@@ -112,6 +112,38 @@ using PDMPFlux
         @test all(isfinite.(hcat(output.x...)))
         @test all(isfinite.(hcat(output.v...)))
     end
+
+    @testset "Manual gradient: no AD should leak Dual into ∇U" begin
+        # ForwardECMC: user-defined ∇U only for Vector{Float64}
+        let dim = 10
+            ∇U_strict(x::Vector{Float64}) = @. tanh(x / 2)
+            sampler = ForwardECMC(dim, ∇U_strict; grid_size=10, tmax=1.0, mix_p=0.0, switch=true)
+            xinit = randn(dim)
+            vinit = ones(dim) / sqrt(dim)
+            hist = sample_skeleton(sampler, 50, xinit, vinit; seed=1, verbose=false)
+            @test length(hist.t) == 50
+        end
+
+        # ZigZag: vectorized bound path previously triggered ForwardDiff.derivative(t -> rate_vect(...))
+        let dim = 5
+            ∇U_strict(x::Vector{Float64}) = x
+            sampler = ZigZag(dim, ∇U_strict; grid_size=10, tmax=1.0, vectorized_bound=true, signed_bound=true)
+            xinit = randn(dim)
+            vinit = ones(dim)
+            hist = sample_skeleton(sampler, 50, xinit, vinit; seed=2, verbose=false)
+            @test length(hist.t) == 50
+        end
+
+        # BPS: non-vectorized bound path previously triggered ForwardDiff.derivative(t -> rate(...))
+        let dim = 2
+            ∇U_strict(x::Vector{Float64}) = x
+            sampler = BPS(dim, ∇U_strict; grid_size=10, tmax=1.0, refresh_rate=0.1)
+            xinit = randn(dim)
+            vinit = randn(dim); vinit ./= norm(vinit)
+            hist = sample_skeleton(sampler, 50, xinit, vinit; seed=3, verbose=false)
+            @test length(hist.t) == 50
+        end
+    end
     
     @testset "BPS Sampler" begin
         # 2次元ガウシアンでのテスト

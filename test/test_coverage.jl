@@ -133,8 +133,9 @@ using Distributions
         # サンプラー間の比較（基本的な統計量）
         @testset "Sampler Comparison" begin
             for (name, samples) in results
-                @test mean(samples, dims=2) ≈ zeros(dim) atol=0.5
-                @test std(samples, dims=2) ≈ ones(dim) atol=0.5
+                # `mean(..., dims=2)` returns a (dim, 1) matrix; compare as vectors.
+                @test all(isapprox.(vec(mean(samples, dims=2)), zeros(dim); atol=0.5))
+                @test all(isapprox.(vec(std(samples, dims=2)), ones(dim); atol=0.5))
             end
         end
     end
@@ -217,6 +218,92 @@ using Distributions
             output1 = sample_skeleton(sampler, 100, 0.0, 1.0, seed=42)
             output2 = sample_skeleton(sampler, 100, 0.0, 1.0, seed=42)
             @test output1.t ≈ output2.t
+        end
+    end
+
+    @testset "Uncovered samplers: SpeedUpZigZag / StickyZigZag" begin
+        function U_quad(x::AbstractVector)
+            return sum(abs2, x) / 2
+        end
+
+        @testset "SpeedUpZigZagAD basic run" begin
+            dim = 2
+            xinit = [0.0, 0.0]
+            vinit = [1.0, 1.0]
+
+            sampler = @test_logs (:warn,) SpeedUpZigZagAD(
+                dim,
+                U_quad;
+                grid_size=5,
+                tmax=0,                 # trigger adaptive tmax branch
+                vectorized_bound=false, # trigger signed/vec compatibility branch
+                signed_bound=true,
+                AD_backend="Zygote",
+            )
+            @test sampler.adaptive == true
+            @test sampler.signed_bound == false
+
+            history = sample_skeleton(sampler, 80, xinit, vinit; seed=42, verbose=false)
+            @test length(history.t) == 80
+            @test all(isfinite.(history.t))
+            samples = sample_from_skeleton(sampler, 50, history)
+            @test size(samples) == (dim, 50)
+            @test all(isfinite.(samples))
+        end
+
+        @testset "StickyZigZagAD stick/thaw loop run" begin
+            dim = 2
+            κ = fill(100.0, dim)  # large thawing rate to exercise thawing paths
+            # make an axis crossing almost immediate for coord 1
+            xinit = [1e-6, 0.2]
+            vinit = [-1.0, -1.0]
+
+            sampler = @test_logs (:warn,) StickyZigZagAD(
+                dim,
+                U_quad,
+                κ;
+                grid_size=5,
+                tmax=0,                 # trigger adaptive tmax branch
+                vectorized_bound=false, # trigger signed/vec compatibility branch
+                signed_bound=true,
+                AD_backend="Zygote",
+            )
+            @test sampler.adaptive == true
+            @test sampler.signed_bound == false
+
+            history = sample_skeleton(sampler, 120, xinit, vinit; seed=42, verbose=false)
+            @test length(history.t) == 120
+            @test all(isfinite.(history.t))
+
+            # Sticky samplers should produce `is_active` information.
+            @test size(history.is_active) == (dim, 120)
+            @test any(.!history.is_active)  # at least one coordinate stuck at some point
+
+            # Cover StickyPDMP overloads in `sample_from_skeleton`
+            @test_throws ArgumentError sample_from_skeleton(sampler, 0, history)
+            samplesN = sample_from_skeleton(sampler, 40, history)
+            @test size(samplesN) == (dim, 40)
+            @test all(isfinite.(samplesN))
+
+            # dt-based reconstruction dispatch (also has StickyPDMP overload)
+            samplesdt = sample_from_skeleton(sampler, 0.01, history)
+            @test size(samplesdt, 1) == dim
+            @test all(isfinite.(samplesdt))
+        end
+
+        @testset "Public API wrappers coverage (SamplingLoop.jl / sample.jl)" begin
+            # 1D scalar dispatch paths
+            function U_1d(x::Float64)
+                return x^2 / 2
+            end
+            sampler1d = ZigZagAD(1, U_1d; grid_size=0)
+
+            h1 = PDMPFlux.sample_skeleton(sampler1d, 30, 0.1, 1.0; seed=123, verbose=false)
+            @test length(h1.t) == 30
+
+            @test_throws ArgumentError PDMPFlux.sample_from_skeleton(sampler1d, 0, h1)
+            s1 = PDMPFlux.sample(sampler1d, 30, 20, 0.1, 1.0; seed=123, verbose=false)
+            @test size(s1) == (1, 20)
         end
     end
 end

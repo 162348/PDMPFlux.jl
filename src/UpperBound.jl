@@ -36,6 +36,43 @@ function upper_bound_constant(func::Function, start::Union{Float64,Int}, horizon
 end
 
 using ForwardDiff
+using Zygote, ReverseDiff
+
+"""
+    finite_difference_derivative(func, x; start=-Inf, horizon=Inf)
+
+数値微分（有限差分）で `d/dx func(x)` を近似する。
+
+- `func` は `Float64 -> Real` だけでなく `Float64 -> AbstractArray` も許す（要素ごとに差分を取る）。
+- `start`/`horizon` を与えると境界の外に出ないように差分幅を調整する。
+"""
+function finite_difference_derivative(
+    func::Function,
+    x::Float64;
+    start::Float64 = -Inf,
+    horizon::Float64 = Inf,
+)
+    fx = func(x)
+    # sqrt(eps) スケールのステップ（x=0 近傍も安定化）
+    h = sqrt(eps(Float64)) * max(1.0, abs(x))
+
+    x_minus = max(start, x - h)
+    x_plus  = min(horizon, x + h)
+
+    # 退化ケース（区間が潰れた等）: 形だけゼロを返す
+    if x_plus == x_minus
+        return fx .- fx
+    end
+
+    # 端点近傍では片側差分にフォールバック
+    if x_minus == x
+        return (func(x_plus) - fx) / (x_plus - x)
+    elseif x_plus == x
+        return (fx - func(x_minus)) / (x - x_minus)
+    else
+        return (func(x_plus) - func(x_minus)) / (x_plus - x_minus)
+    end
+end
 
 """
     upper_bound_grid(func, start=0.0, horizon, n_grid, refresh_rate)
@@ -51,7 +88,7 @@ using ForwardDiff
     Returns:
         BoundBox: An object containing the upper bound constant information.
 """
-function upper_bound_grid(func::Function, start::Float64, horizon::Float64, n_grid::Int=100, refresh_rate::Float64 = 0.0; AD_backend::String="ForwardDiff")::BoundBox
+function upper_bound_grid(func::Function, start::Float64, horizon::Float64, n_grid::Int=100, refresh_rate::Float64 = 0.0; AD_backend::String="FiniteDiff")::BoundBox
     # grid の生成
     t = range(start, stop=horizon, length=n_grid)
     step_size = t[2] - t[1]  # jax と最後の桁の数値が違う
@@ -62,6 +99,18 @@ function upper_bound_grid(func::Function, start::Float64, horizon::Float64, n_gr
         grads = [ForwardDiff.derivative(func, x) for x in t]
     elseif AD_backend == "Zygote"
         grads = [Zygote.gradient(func, x)[1][1] for x in t]
+    elseif AD_backend == "ReverseDiff"
+        grads = [ReverseDiff.gradient(func, [x])[1] for x in t]
+    elseif AD_backend == "Enzyme"
+        if HAS_ENZYME
+            grads = [Enzyme.gradient(Enzyme.Reverse, func, Enzyme.Active(x))[1] for x in t]
+        else
+            throw(ArgumentError("Enzyme package is not available. Please install it with: ] add Enzyme"))
+        end
+    elseif AD_backend == "FiniteDiff" || AD_backend == "Undefined"
+        grads = [finite_difference_derivative(func, Float64(x); start=start, horizon=horizon) for x in t]
+    else
+        throw(ArgumentError("Unsupported AD_backend: $AD_backend"))
     end
     
     intersection_pos = (values[1:end-1] .- values[2:end] .+ (grads[2:end] .* step_size)) ./ (grads[2:end] .- grads[1:end-1])
@@ -80,7 +129,7 @@ function upper_bound_grid(func::Function, start::Float64, horizon::Float64, n_gr
     return BoundBox(collect(t), box_max, cum_sum, step_size)
 end
 
-function upper_bound_grid_test(func::Function, start::Float64, horizon::Float64, n_grid::Int=100, refresh_rate::Float64 = 0.0; AD_backend::String="ForwardDiff")::BoundBox
+function upper_bound_grid_test(func::Function, start::Float64, horizon::Float64, n_grid::Int=100, refresh_rate::Float64 = 0.0; AD_backend::String="FiniteDiff")::BoundBox
     # grid の生成
     t = range(start, stop=horizon, length=n_grid)
     step_size = t[2] - t[1]  # jax と最後の桁の数値が違う
@@ -91,6 +140,18 @@ function upper_bound_grid_test(func::Function, start::Float64, horizon::Float64,
         grads = [ForwardDiff.derivative(func, x) for x in t]
     elseif AD_backend == "Zygote"
         grads = [Zygote.gradient(func, x)[1][1] for x in t]
+    elseif AD_backend == "ReverseDiff"
+        grads = [ReverseDiff.gradient(func, [x])[1] for x in t]
+    elseif AD_backend == "Enzyme"
+        if HAS_ENZYME
+            grads = [Enzyme.gradient(Enzyme.Reverse, func, Enzyme.Active(x))[1] for x in t]
+        else
+            throw(ArgumentError("Enzyme package is not available. Please install it with: ] add Enzyme"))
+        end
+    elseif AD_backend == "FiniteDiff" || AD_backend == "Undefined"
+        grads = [finite_difference_derivative(func, Float64(x); start=start, horizon=horizon) for x in t]
+    else
+        throw(ArgumentError("Unsupported AD_backend: $AD_backend"))
     end
     
     ## compute the intersection position of two tangents on the two edges of the interval
@@ -128,7 +189,7 @@ using LinearAlgebra
     Returns:
         BoundBox: An object containing the upper bound constant information.
 """
-function upper_bound_grid_vect(func, start::Float64, horizon::Float64, n_grid::Int=100; AD_backend::String="ForwardDiff")::BoundBox
+function upper_bound_grid_vect(func, start::Float64, horizon::Float64, n_grid::Int=100; AD_backend::String="FiniteDiff")::BoundBox
     t = range(start, stop=horizon, length=n_grid)
     step_size = t[2] - t[1]
     
@@ -138,8 +199,20 @@ function upper_bound_grid_vect(func, start::Float64, horizon::Float64, n_grid::I
         grads = hcat([ForwardDiff.derivative(func, x) for x in t]...)
     elseif AD_backend == "Zygote"
         grads = hcat([Zygote.jacobian(func, x)[1] for x in t]...)
+    elseif AD_backend == "ReverseDiff"
+        grads = hcat([ReverseDiff.gradient(func, [x]) for x in t]...)
+    elseif AD_backend == "Enzyme"
+        if HAS_ENZYME
+            grads = hcat([Enzyme.gradient(Enzyme.Reverse, func, Enzyme.Active([x]))[1] for x in t]...)
+        else
+            throw(ArgumentError("Enzyme package is not available. Please install it with: ] add Enzyme"))
+        end
     elseif AD_backend == "PolyesterForwardDiff"
         grads = hcat([threaded_gradient(func, [x], ForwardDiff.Chunk(8)) for x in t]...)
+    elseif AD_backend == "FiniteDiff" || AD_backend == "Undefined"
+        grads = hcat([finite_difference_derivative(func, Float64(x); start=start, horizon=horizon) for x in t]...)
+    else
+        throw(ArgumentError("Unsupported AD_backend: $AD_backend"))
     end
     
     intersection_pos = (values[:,1:end-1] .- values[:,2:end] .+ (grads[:,2:end] .* t[2:end]') .- (grads[:,1:end-1] .* t[1:end-1]')) ./ (grads[:,2:end] .- grads[:,1:end-1])

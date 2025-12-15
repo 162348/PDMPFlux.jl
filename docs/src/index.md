@@ -40,7 +40,6 @@ N_sk, xinit, vinit = 20_000, zeros(dim), ones(dim)
 output = sample_skeleton(sampler, N_sk, xinit, vinit, seed=2025)
 
 plot_traj(output, 300, plot_type="3D")
-anim_traj(output, 100)
 ```
 
 ```@autodocs

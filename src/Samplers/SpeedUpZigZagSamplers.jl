@@ -32,30 +32,31 @@ using Distributions
 - `velocity_jump::Function`: 速度ジャンプ関数。
 - `state`: ZigZagサンプラーの状態。
 """
-mutable struct SpeedUpZigZag <: AbstractPDMP
+mutable struct SpeedUpZigZag{G,KF,KR,KRV,KSR,KSRV,KVJ} <: AbstractPDMP
     dim::Int
-    ∇U::Function
+    ∇U::G
     grid_size::Int
     tmax::Float64
     refresh_rate::Float64
     vectorized_bound::Bool
     signed_bound::Bool
     adaptive::Bool
-    flow::Function
-    rate::Function
-    rate_vect::Function
-    signed_rate::Union{Function, Nothing}
-    signed_rate_vect::Function
-    velocity_jump::Function
+    flow::KF
+    rate::KR
+    rate_vect::KRV
+    signed_rate::KSR
+    signed_rate_vect::KSRV
+    velocity_jump::KVJ
     rng::AbstractRNG
     state::Any
+    AD_backend::String
 
     """
     Constructor for ZigZag sampler
         - `refresh_rate::Float64`: Not yet used 1/13/2025
     """
-    function SpeedUpZigZag(dim::Int, ∇U::Function; grid_size::Int=10, tmax::Union{Float64, Int}=2.0, 
-                    refresh_rate::Float64=0.0, vectorized_bound::Bool=true, signed_bound::Bool=true, adaptive::Bool=true)
+    function SpeedUpZigZag(dim::Int, ∇U; grid_size::Int=10, tmax::Union{Float64, Int}=2.0, 
+                    refresh_rate::Float64=0.0, vectorized_bound::Bool=true, signed_bound::Bool=true, adaptive::Bool=true, AD_backend::String="FiniteDiff")
         
         tmax = Float64(tmax)  # convert tmax to Float64
 
@@ -101,38 +102,19 @@ mutable struct SpeedUpZigZag <: AbstractPDMP
 
         # Define velocity jump function
         function velocity_jump(x, v, rng)
-            g = ∇U_effective(x)
-            total = 0.0
-            @inbounds for i in 1:dim
-                λ = g[i] * v[i]
-                if λ > 0.0
-                    total += λ
-                end
-            end
-
-            if total == 0.0
-                return v
-            end
-
-            u = rand(rng) * total
-            acc = 0.0
-            m = 1
-            @inbounds for i in 1:dim
-                λ = g[i] * v[i]
-                if λ > 0.0
-                    acc += λ
-                    if acc >= u
-                        m = i
-                        break
-                    end
-                end
-            end
+            lambda_t = max.(0.0, ∇U_effective(x) .* v)
+            p = lambda_t ./ sum(lambda_t)
+            m = rand(rng, Categorical(p))
             v[m] *= -1
             return v
         end
 
-        new(dim, ∇U, grid_size, tmax, refresh_rate, vectorized_bound, signed_bound, adaptive,
-            flow, rate, rate_vect, signed_rate, signed_rate_vect, velocity_jump, Random.default_rng(), nothing)
+        rng = Random.default_rng()
+        state = nothing
+        return new{typeof(∇U), typeof(flow), typeof(rate), typeof(rate_vect), typeof(signed_rate), typeof(signed_rate_vect),
+                   typeof(velocity_jump)}(
+            dim, ∇U, grid_size, tmax, refresh_rate, vectorized_bound, signed_bound, adaptive,
+            flow, rate, rate_vect, signed_rate, signed_rate_vect, velocity_jump, rng, state, AD_backend)
     end
 end
 
@@ -142,6 +124,6 @@ function SpeedUpZigZagAD(dim::Int, U::Function; refresh_rate::Float64=0.0, grid_
     ∇U = set_AD_backend(AD_backend, U, dim)
 
     return SpeedUpZigZag(dim, ∇U, refresh_rate=refresh_rate, grid_size=grid_size, tmax=tmax, vectorized_bound=vectorized_bound, 
-                    signed_bound=signed_bound, adaptive=adaptive)
+                    signed_bound=signed_bound, adaptive=adaptive, AD_backend=AD_backend)
 end
 

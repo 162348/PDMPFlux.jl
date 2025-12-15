@@ -38,6 +38,30 @@ function get_event_state!(state::PDMPState, sampler::AbstractPDMP)::PDMPState
     return state
 end
 
+"""
+    get_event_state!(state::PDMPState, sampler::StickyPDMP)::PDMPState
+
+Sticky samplers treat "sticking/thawing" as events that must break the outer loop.
+Without this specialized method, calls to `get_event_state!(..., ::StickyPDMP)` would
+fall back to the generic implementation and only check `state.accept`, which can lead
+to incorrect behavior (e.g. not terminating promptly on stick/thaw events).
+"""
+function get_event_state!(state::PDMPState, sampler::StickyPDMP)::PDMPState
+    state.errored_bound = 0
+    state.rejected = 0
+    state.hitting_horizon = 0
+    fill!(state.error_value_ar, zero(eltype(state.error_value_ar)))
+
+    while !state.accept && !state.stick_or_thaw_event
+        # Implemented in `StickySamplingLoop.jl` (mutates `state` in-place).
+        one_step_of_thinning_or_sticking_or_thawing(state, sampler)
+    end
+
+    state.accept = false
+    state.stick_or_thaw_event = false
+    return state
+end
+
 function one_step_of_thinning!(state::PDMPState, sampler::AbstractPDMP)::PDMPState
     # build a (possibly) masked velocity without allocating
     v_used = _active_velocity(state)

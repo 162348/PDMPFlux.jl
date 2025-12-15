@@ -6,6 +6,28 @@ using Random
 abstract type AbstractPDMP end
 
 """
+    _pdmp_ad_backend(pdmp) -> String
+
+PDMP 内部で上界計算（`upper_bound_grid*`）に使う AD backend を決める。
+
+- `pdmp` が `AD_backend` フィールドを持つ場合はそれを優先
+- `"Undefined"` や空文字は安全側に倒して `"FiniteDiff"` を選ぶ
+- フィールドが無い場合も `"FiniteDiff"` をデフォルトにする
+
+"""
+function _pdmp_ad_backend(pdmp)::String
+    if hasproperty(pdmp, :AD_backend)
+        ab = getproperty(pdmp, :AD_backend)
+        if ab === nothing
+            return "FiniteDiff"
+        end
+        ab = String(ab)
+        return (ab == "" || ab == "Undefined") ? "FiniteDiff" : ab
+    end
+    return "FiniteDiff"
+end
+
+"""
     ダイナミクスが抽象化された PDMP でサンプリングを行うための抽象構造体
 
     属性:
@@ -90,6 +112,8 @@ function init_state(pdmp::AbstractPDMP, xinit::AbstractVector{Float64}, vinit::A
         throw(ArgumentError("grid_size must be non-negative. Current value: $(pdmp.grid_size)"))
     end
 
+    ad_backend = _pdmp_ad_backend(pdmp)
+
     # グリッドサイズが0の場合、Brentのアルゴリズムを使用して定数上限戦略を使用
     if pdmp.grid_size == 0
         upper_bound_func = function(x, v, horizon)
@@ -99,12 +123,12 @@ function init_state(pdmp::AbstractPDMP, xinit::AbstractVector{Float64}, vinit::A
     elseif !pdmp.vectorized_bound
         upper_bound_func = function(x, v, horizon)
             func = t -> rate(x, v, t)
-            return upper_bound_grid(func, 0.0, horizon, pdmp.grid_size, refresh_rate)
+            return upper_bound_grid(func, 0.0, horizon, pdmp.grid_size, refresh_rate; AD_backend=ad_backend)
         end
     else
         upper_bound_func = function(x, v, horizon)
             func = t -> rate_vect(x, v, t)
-            return upper_bound_grid_vect(func, 0.0, horizon, pdmp.grid_size) 
+            return upper_bound_grid_vect(func, 0.0, horizon, pdmp.grid_size; AD_backend=ad_backend) 
         end
     end
 
