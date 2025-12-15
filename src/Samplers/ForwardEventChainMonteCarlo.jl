@@ -130,7 +130,7 @@ Perform velocity jump for Forward Event Chain Monte Carlo.
 - `Vector{Float64}`: New velocity
 """
 function _velocity_jump_event_chain(x::Vector{Float64}, v::Vector{Float64}, 
-                                  key::Random.AbstractRNG, ∇U::Function, 
+                                  key::Random.AbstractRNG, ∇U, 
                                   dim::Int, mix_p::Float64, ran_p::Bool,
                                   switch::Bool, positive::Bool)::Vector{Float64}
 
@@ -172,7 +172,7 @@ function _velocity_jump_event_chain(x::Vector{Float64}, v::Vector{Float64},
 end
 
 function _velocity_jump_event_chain_speed_up(x::Vector{Float64}, v::Vector{Float64}, 
-    key::Random.AbstractRNG, ∇U::Function, 
+    key::Random.AbstractRNG, ∇U, 
     dim::Int, mix_p::Float64, ran_p::Bool,
     switch::Bool, positive::Bool, speed_factor::Float64)::Vector{Float64}
 
@@ -213,21 +213,21 @@ function _velocity_jump_event_chain_speed_up(x::Vector{Float64}, v::Vector{Float
     return v_out
 end
 
-mutable struct ForwardECMC <: AbstractPDMP
+mutable struct ForwardECMC{G,KF,KR,KRV,KSR,KSRV,KVJ} <: AbstractPDMP
   dim::Int
-  ∇U::Function
+  ∇U::G
   grid_size::Int
   tmax::Float64
   refresh_rate::Float64
   vectorized_bound::Bool
   signed_bound::Bool
   adaptive::Bool
-  flow::Function
-  rate::Union{Function, Nothing}
-  rate_vect::Union{Function, Nothing}
-  signed_rate::Union{Function, Nothing}
-  signed_rate_vect::Union{Function, Nothing}
-  velocity_jump::Function
+  flow::KF
+  rate::KR
+  rate_vect::KRV
+  signed_rate::KSR
+  signed_rate_vect::KSRV
+  velocity_jump::KVJ
   rng::AbstractRNG
   state::Union{PDMPState, Nothing}
   ran_p::Bool  # Whether to use ran-p-orthogonal refresh or orthogonal switch
@@ -252,8 +252,8 @@ mutable struct ForwardECMC <: AbstractPDMP
   - `ran_p::Bool=false`: Use random orthogonal refresh
   - `mix_p::Float64=0.5`: Mixture probability for refreshment
   """
-  function ForwardECMC(dim::Int, ∇U::Function; grid_size::Int=10, tmax::Union{Float64, Int}=2.0,
-    signed_bound::Bool=true, adaptive::Bool=true, ran_p::Bool=false, mix_p::Float64=0.5, switch::Bool=true, positive::Bool=true, AD_backend::String="Undefined",
+  function ForwardECMC(dim::Int, ∇U; grid_size::Int=10, tmax::Union{Float64, Int}=2.0,
+    signed_bound::Bool=true, adaptive::Bool=true, ran_p::Bool=false, mix_p::Float64=0.5, switch::Bool=true, positive::Bool=true, AD_backend::String="FiniteDiff",
     speed_factor::Float64=1.0)
 
     # Input validation and preprocessing
@@ -282,52 +282,15 @@ mutable struct ForwardECMC <: AbstractPDMP
         velocity_jump = (x, v, key) -> _velocity_jump_event_chain(x, v, key, ∇U, dim, mix_p, ran_p, switch, positive)
     end
 
-    new(dim, ∇U, grid_size, tmax, refresh_rate, vectorized_bound, signed_bound, adaptive, flow, rate, rate_vect, signed_rate, signed_rate_vect, velocity_jump, Random.default_rng(), nothing, ran_p, switch, mix_p, AD_backend, speed_factor)
+    rng = Random.default_rng()
+    state = nothing
+    return new{typeof(∇U), typeof(flow), typeof(rate), typeof(rate_vect), typeof(signed_rate), typeof(signed_rate_vect),
+               typeof(velocity_jump)}(
+        dim, ∇U, grid_size, tmax, refresh_rate, vectorized_bound, signed_bound, adaptive,
+        flow, rate, rate_vect, signed_rate, signed_rate_vect, velocity_jump,
+        rng, state, ran_p, switch, mix_p, AD_backend, speed_factor)
   end
 end  # mutable struct ForwardECMC
-
-"""
-    create_gradient_function(U::Function, dim::Int, AD_backend::Module)
-
-Create a gradient function compatible with automatic differentiation.
-
-# Arguments
-- `U::Function`: Potential function
-- `dim::Int`: Dimension  
-- `AD_backend::Module`: AD backend module
-
-# Returns
-- `Function`: Gradient function that works with Float64 and ForwardDiff.Dual
-"""
-function create_gradient_function(U::Function, dim::Int, AD_backend::String)::Function
-    Backend = eval(Symbol(AD_backend))
-    
-    if dim == 1
-        try
-            U([1.0])
-            return function(x)
-                return Backend.gradient(U, x)[1]
-            end
-        catch e
-            @warn "1D function detected, adapting gradient function: $e"
-            return function(x)
-                return Backend.gradient(U, x[1])[1]
-            end
-        end
-    else
-        if AD_backend == "Zygote"
-            return function(x)
-                return Backend.gradient(U, x)[1]
-            end
-        elseif AD_backend == "ForwardDiff"
-            return function(x)
-                return Backend.gradient(U, x)
-            end
-        else
-            throw(ArgumentError("Unsupported backend: $AD_backend"))
-        end
-    end
-end
 
 """
     ForwardECMCAD(dim, U; kwargs...)
@@ -354,7 +317,7 @@ function ForwardECMCAD(dim::Int, U::Function; grid_size::Int=10, tmax::Union{Flo
     signed_bound::Bool=true, adaptive::Bool=true, AD_backend::String="Zygote",
     ran_p::Bool=true, mix_p::Float64=0.5, switch::Bool=true, positive::Bool=true, speed_factor::Float64=1.0)
     
-    # Create gradient function using the helper function
+    # Create gradient function using the shared AD backend helper (defined in src/ADBackend.jl)
     ∇U = create_gradient_function(U, dim, AD_backend)
     
     # Create and return sampler

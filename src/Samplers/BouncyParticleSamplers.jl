@@ -1,25 +1,26 @@
-mutable struct BPS <: AbstractPDMP
+mutable struct BPS{G,KF,KR,KRV,KSR,KSRV,KVJ} <: AbstractPDMP
   dim::Int
-  ∇U::Function
+  ∇U::G
   grid_size::Int
   tmax::Float64
   refresh_rate::Float64
   vectorized_bound::Bool
   signed_bound::Bool
   adaptive::Bool
-  flow::Function
-  rate::Function
-  rate_vect::Union{Function, Nothing}
-  signed_rate::Function
-  signed_rate_vect::Union{Function, Nothing}
-  velocity_jump::Function
+  flow::KF
+  rate::KR
+  rate_vect::KRV
+  signed_rate::KSR
+  signed_rate_vect::KSRV
+  velocity_jump::KVJ
   rng::AbstractRNG
   state::Any
+  AD_backend::String
 
 # Constructor for BouncyParticle
-  function BPS(dim::Int, ∇U::Function; grid_size::Int=10, tmax::Union{Float64, Int}=1.0,  
+  function BPS(dim::Int, ∇U; grid_size::Int=10, tmax::Union{Float64, Int}=1.0,  
             refresh_rate::Float64=0.1, vectorized_bound::Bool=false, signed_bound::Bool=true,
-            adaptive::Bool=true)
+            adaptive::Bool=true, AD_backend::String="FiniteDiff")
     
     tmax = Float64(tmax)
 
@@ -65,8 +66,12 @@ mutable struct BPS <: AbstractPDMP
         end
     end
 
-    return new(dim, ∇U, grid_size, tmax, refresh_rate, vectorized_bound, signed_bound, adaptive,
-                          flow, rate, rate_vect, signed_rate, signed_rate_vect, velocity_jump, Random.default_rng(), nothing)
+    rng = Random.default_rng()
+    state = nothing
+    return new{typeof(∇U), typeof(flow), typeof(rate), typeof(rate_vect), typeof(signed_rate), typeof(signed_rate_vect),
+               typeof(velocity_jump)}(
+        dim, ∇U, grid_size, tmax, refresh_rate, vectorized_bound, signed_bound, adaptive,
+        flow, rate, rate_vect, signed_rate, signed_rate_vect, velocity_jump, rng, state, AD_backend)
   end
 
 end  # mutable struct BPS
@@ -74,28 +79,8 @@ end  # mutable struct BPS
 function BPSAD(dim::Int, U::Function; refresh_rate::Float64=0.0, grid_size::Int=10, tmax::Union{Float64, Int}=2.0, 
                     vectorized_bound::Bool=true, signed_bound::Bool=true, adaptive::Bool=true, AD_backend::String="Zygote")
 
-  ∇U = nothing
-  AD_backend = eval(Symbol(AD_backend))
-
-  ## If U is one dimensional and takes Float64 instead of Vector{Float64}, change ∇U accordingly:
-  if dim == 1
-    try
-        U([1.0])
-    catch
-        ∇U = function(x::Vector)
-            return AD_backend.gradient(U, x[1])[1]
-        end
-    else
-        ∇U = function(x::Vector)
-            return AD_backend.gradient(U, x)[1]
-        end
-    end
-  else
-      ∇U = function(x::Vector)
-          return AD_backend.gradient(U, x)[1]
-      end
-  end
+  ∇U = set_AD_backend(AD_backend, U, dim)
 
   return BPS(dim, ∇U, refresh_rate=refresh_rate, grid_size=grid_size, tmax=tmax, 
-                    signed_bound=signed_bound, adaptive=adaptive)
+                    signed_bound=signed_bound, adaptive=adaptive, AD_backend=AD_backend)
 end
