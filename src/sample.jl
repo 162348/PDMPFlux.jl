@@ -129,6 +129,158 @@ function sample_skeleton(
 end
 
 """
+    sample_skeleton(sampler::AbstractPDMP, T::Float64, xinit, vinit; seed, verbose, init_capacity)
+
+`n_sk` ではなく「時刻 `T` まで」PDMP を進めてスケルトンを返す版。
+
+- 事前にイベント数は分からないため、`PDMPHistory` は `init_capacity` で確保し、
+  以降は必要に応じて倍々に拡張（copy）する。
+- 返り値は `t[end] == T` になるように、最後に deterministic flow で `t=T` の点を 1 点追加する
+  （`sample_from_skeleton` が `t[end]` を時間スケールとして使うため）。
+"""
+function sample_skeleton(
+    sampler::AbstractPDMP,
+    T::Float64,
+    xinit::Vector{Float64},
+    vinit::Vector{Float64};
+    seed::Union{Int, Nothing}=nothing,
+    verbose::Bool=true,
+    init_capacity::Int=1024,
+)::PDMPHistory
+
+    if !(isfinite(T)) || T < 0
+        throw(ArgumentError("T must be finite and non-negative. Current value: $T"))
+    end
+
+    d = length(xinit)
+    state = init_state(sampler, xinit, vinit, seed)
+
+    cap = max(1, init_capacity)
+    history = PDMPHistory(d, cap)
+    k = 1
+    record!(history, k, state, d)
+
+    show_progress = verbose && isinteractive()
+    last_pct = -1
+    if show_progress && T > 0
+        # print 0% at the beginning
+        print(stderr, "\r[sample_skeleton] 0%  (t=0/$(T), events=$(k))")
+        flush(stderr)
+        last_pct = 0
+    end
+
+    # T==0 の場合は初期点だけで十分
+    if T == 0.0
+        sampler.state = state
+        return _trim_history(history, d, k)
+    end
+
+    # 直前状態の退避（overshoot した場合に flow で t=T の点を作るため）
+    x_prev = similar(state.x)
+    v_prev = similar(state.v)
+    active_prev = BitVector(undef, d)
+    v_used = similar(state.v)
+    t_prev = 0.0
+
+    while state.t < T
+        copyto!(x_prev, state.x)
+        copyto!(v_prev, state.v)
+        @inbounds for i in 1:d
+            active_prev[i] = state.is_active[i]
+        end
+        t_prev = state.t
+
+        state = get_event_state(state, sampler)
+
+        if state.t <= T
+            k += 1
+            if k > size(history.X, 2)
+                newcap = max(k, 2 * size(history.X, 2))
+                history = _grow_history(history, d, newcap, k - 1)
+            end
+            record!(history, k, state, d)
+        else
+            # overshoot: 直前点から flow で t=T の点を作って追加し、そこで打ち切る
+            τ = T - t_prev
+            if sampler isa StickyPDMP
+                @inbounds for i in 1:d
+                    v_used[i] = active_prev[i] ? v_prev[i] : 0.0
+                end
+            else
+                copyto!(v_used, v_prev)
+            end
+
+            xT, vT = sampler.flow(x_prev, v_used, τ)
+            state.x = xT
+            state.v = vT
+            state.t = T
+            @inbounds for i in 1:d
+                state.is_active[i] = active_prev[i]
+            end
+            # record! が参照する統計量は「非イベント点」なので 0 埋めにしておく
+            state.ar = 0.0
+            state.errored_bound = 0
+            fill!(state.error_value_ar, 0.0)
+            state.rejected = 0
+            state.hitting_horizon = 0
+
+            # v_active の整合性も保つ
+            @inbounds for i in 1:d
+                state.v_active[i] = state.is_active[i] ? state.v[i] : 0.0
+            end
+
+            k += 1
+            if k > size(history.X, 2)
+                newcap = max(k, 2 * size(history.X, 2))
+                history = _grow_history(history, d, newcap, k - 1)
+            end
+            record!(history, k, state, d)
+            break
+        end
+
+        if show_progress
+            pct = Int(floor(100 * min(state.t / T, 1.0)))
+            if pct != last_pct
+                print(stderr, "\r[sample_skeleton] $(pct)%  (t=$(round(state.t; digits=4))/$(T), events=$(k))")
+                flush(stderr)
+                last_pct = pct
+            end
+        end
+    end
+
+    sampler.state = state
+    if show_progress
+        print(stderr, "\r[sample_skeleton] 100% (t=$(T)/$(T), events=$(k))\n")
+        flush(stderr)
+    end
+    return _trim_history(history, d, k)
+end
+
+## Dispatch method for 1d (time horizon)
+function sample_skeleton(
+    sampler::AbstractPDMP,
+    T::Float64,
+    xinit::Union{Float64, Int},
+    vinit::Union{Float64, Int};
+    seed::Union{Int, Nothing}=nothing,
+    verbose::Bool=true,
+    init_capacity::Int=1024,
+)::PDMPHistory
+    if !isfinite(xinit) || !isfinite(vinit)
+        throw(ArgumentError("initial values contain NaN, Inf, or -Inf."))
+    end
+    return sample_skeleton(
+        sampler,
+        T,
+        [Float64(xinit)],
+        [Float64(vinit)];
+        seed=seed,
+        verbose=verbose,
+        init_capacity=init_capacity,
+    )
+end
+
+"""
     スケルトンからサンプリングをし，各行ベクトルに次元毎の時系列が格納された Matrix{Float64} を返す．
 
     Args:

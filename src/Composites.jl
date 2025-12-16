@@ -162,6 +162,56 @@ function PDMPHistory(d::Int, n::Int; T=Float64)
     )
 end
 
+"""
+    _grow_history(h::PDMPHistory, d::Int, newn::Int, filled::Int) -> PDMPHistory
+
+Return a new `PDMPHistory` with capacity `newn` and copy the first `filled` columns/entries.
+This is used to support time-horizon sampling where the number of skeleton points is not known a priori.
+"""
+function _grow_history(h::PDMPHistory{T}, d::Int, newn::Int, filled::Int) where {T}
+    if newn <= size(h.X, 2)
+        return h
+    end
+    newh = PDMPHistory(d, newn; T=T)
+    if filled > 0
+        # X, V: contiguous in column-major memory
+        copyto!(newh.X, 1, h.X, 1, d * filled)
+        copyto!(newh.V, 1, h.V, 1, d * filled)
+        copyto!(newh.t, 1, h.t, 1, filled)
+        copyto!(newh.horizon, 1, h.horizon, 1, filled)
+        copyto!(newh.ar, 1, h.ar, 1, filled)
+        copyto!(newh.errored_bound, 1, h.errored_bound, 1, filled)
+        copyto!(newh.rejected, 1, h.rejected, 1, filled)
+        copyto!(newh.hitting_horizon, 1, h.hitting_horizon, 1, filled)
+        copyto!(newh.error_value_ar, 1, h.error_value_ar, 1, 5 * filled)
+        @views newh.is_active[:, 1:filled] .= h.is_active[:, 1:filled]
+    end
+    return newh
+end
+
+"""
+    _trim_history(h::PDMPHistory, d::Int, filled::Int) -> PDMPHistory
+
+Return a new `PDMPHistory` of length `filled` containing only the recorded prefix.
+"""
+function _trim_history(h::PDMPHistory{T}, d::Int, filled::Int) where {T}
+    filled == size(h.X, 2) && return h
+    newh = PDMPHistory(d, filled; T=T)
+    if filled > 0
+        copyto!(newh.X, 1, h.X, 1, d * filled)
+        copyto!(newh.V, 1, h.V, 1, d * filled)
+        copyto!(newh.t, 1, h.t, 1, filled)
+        copyto!(newh.horizon, 1, h.horizon, 1, filled)
+        copyto!(newh.ar, 1, h.ar, 1, filled)
+        copyto!(newh.errored_bound, 1, h.errored_bound, 1, filled)
+        copyto!(newh.rejected, 1, h.rejected, 1, filled)
+        copyto!(newh.hitting_horizon, 1, h.hitting_horizon, 1, filled)
+        copyto!(newh.error_value_ar, 1, h.error_value_ar, 1, 5 * filled)
+        @views newh.is_active[:, 1:filled] .= h.is_active[:, 1:filled]
+    end
+    return newh
+end
+
 # Backward-compatible constructor (older code created history from a state)
 function PDMPHistory(s::PDMPState)
     d = length(s.x)

@@ -20,7 +20,7 @@ mutable struct BPS{G,KF,KR,KRV,KSR,KSRV,KVJ} <: AbstractPDMP
 # Constructor for BouncyParticle
   function BPS(dim::Int, ∇U; grid_size::Int=10, tmax::Union{Float64, Int}=1.0,  
             refresh_rate::Float64=0.1, vectorized_bound::Bool=false, signed_bound::Bool=true,
-            adaptive::Bool=true, AD_backend::String="FiniteDiff")
+            adaptive::Bool=true, AD_backend::String="ForwardDiff")
     
     tmax = Float64(tmax)
 
@@ -77,7 +77,7 @@ mutable struct BPS{G,KF,KR,KRV,KSR,KSRV,KVJ} <: AbstractPDMP
 end  # mutable struct BPS
 
 function BPSAD(dim::Int, U::Function; refresh_rate::Float64=0.0, grid_size::Int=10, tmax::Union{Float64, Int}=2.0, 
-                    vectorized_bound::Bool=true, signed_bound::Bool=true, adaptive::Bool=true, AD_backend::String="Zygote")
+                    vectorized_bound::Bool=true, signed_bound::Bool=true, adaptive::Bool=true, AD_backend::String="ForwardDiff")
 
   ∇U = set_AD_backend(AD_backend, U, dim)
 
