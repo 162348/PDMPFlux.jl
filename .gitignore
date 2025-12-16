@@ -3,6 +3,7 @@
 *.jl.mem
 /Manifest.toml
 /docs/Manifest.toml
+/test/Manifest.toml
 lcov.info
 coverage-html/
 **/.DS_Store
