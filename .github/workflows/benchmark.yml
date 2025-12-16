@@ -26,8 +26,9 @@ jobs:
       
       - name: Run benchmarks
         run: |
-          julia --project=. -e "
+          julia --project=test -e "
           using Pkg
+          Pkg.develop(path=\".\")
           Pkg.instantiate()
           include(\"test/benchmarks.jl\")
           run_benchmarks()

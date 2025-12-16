@@ -139,7 +139,11 @@ function _velocity_jump_event_chain(x::Vector{Float64}, v::Vector{Float64},
     ρ = -sqrt(1 - u^(2 / (dim - 1)))
     
     # Compute normalized gradient direction
-    n = ∇U(x)
+    #
+    # IMPORTANT: `∇U(x)` might (accidentally) return `x` itself (alias), e.g. `∇U(x)=x`.
+    # We must avoid mutating such a returned array in-place, otherwise the sampler would
+    # silently corrupt the state `x` when we normalize the gradient below.
+    n = copy(∇U(x))
     ng = norm(n)
     if ng == 0
         fill!(n, 0.0)
@@ -180,8 +184,8 @@ function _velocity_jump_event_chain_speed_up(x::Vector{Float64}, v::Vector{Float
     u = rand(key)
     ρ = speed_factor * -sqrt(1 - u^(2 / (dim - 1)))
 
-    # Compute normalized gradient direction
-    n = ∇U(x)
+    # Compute normalized gradient direction (see the aliasing note in `_velocity_jump_event_chain`)
+    n = copy(∇U(x))
     ng = norm(n)
     if ng == 0
         fill!(n, 0.0)
@@ -252,9 +256,9 @@ mutable struct ForwardECMC{G,KF,KR,KRV,KSR,KSRV,KVJ} <: AbstractPDMP
   - `ran_p::Bool=false`: Use random orthogonal refresh
   - `mix_p::Float64=0.5`: Mixture probability for refreshment
   """
-  function ForwardECMC(dim::Int, ∇U; grid_size::Int=10, tmax::Union{Float64, Int}=2.0,
-    signed_bound::Bool=true, adaptive::Bool=true, ran_p::Bool=false, mix_p::Float64=0.5, switch::Bool=true, positive::Bool=true, AD_backend::String="FiniteDiff",
-    speed_factor::Float64=1.0)
+  function ForwardECMC(dim::Int, ∇U::Function; grid_size::Int=10, tmax::Union{Float64, Int}=2.0,
+    signed_bound::Bool=true, adaptive::Bool=true, ran_p::Bool=false, mix_p::Float64=0.5, switch::Bool=true,
+    positive::Bool=true, AD_backend::String="ForwardDiff",speed_factor::Float64=1.0)
 
     # Input validation and preprocessing
     tmax = Float64(tmax)
@@ -314,8 +318,8 @@ Create ForwardECMC sampler with automatic differentiation.
 - `ForwardECMC`: Configured sampler instance
 """
 function ForwardECMCAD(dim::Int, U::Function; grid_size::Int=10, tmax::Union{Float64, Int}=2.0,
-    signed_bound::Bool=true, adaptive::Bool=true, AD_backend::String="Zygote",
-    ran_p::Bool=true, mix_p::Float64=0.5, switch::Bool=true, positive::Bool=true, speed_factor::Float64=1.0)
+    signed_bound::Bool=true, adaptive::Bool=true, AD_backend::String="ForwardDiff",
+    ran_p::Bool=false, mix_p::Float64=0.5, switch::Bool=true, positive::Bool=true, speed_factor::Float64=1.0)
     
     # Create gradient function using the shared AD backend helper (defined in src/ADBackend.jl)
     ∇U = create_gradient_function(U, dim, AD_backend)

@@ -52,6 +52,14 @@ using PDMPFlux
         sample_var = var(samples)
         @test abs(sample_mean) < 0.5  # 平均は0に近い
         @test 0.5 < sample_var < 2.0  # 分散は1に近い
+
+        # 時刻Tまでのスケルトンサンプリング（t[end] == T を保証）
+        T = 1.0
+        outputT = sample_skeleton(sampler, T, xinit, vinit, seed=seed, verbose=false, init_capacity=8)
+        @test isapprox(outputT.t[end], T; atol=0, rtol=0)
+        @test all(diff(outputT.t) .>= 0)  # 単調増加（同時刻は起こり得るので >=）
+        samplesT = sample_from_skeleton(sampler, N, outputT)
+        @test all(isfinite.(samplesT))
     end
     
     @testset "ZigZagAD Sampler" begin
@@ -111,6 +119,22 @@ using PDMPFlux
         @test all(isfinite.(output.t))
         @test all(isfinite.(hcat(output.x...)))
         @test all(isfinite.(hcat(output.v...)))
+    end
+
+    @testset "ForwardECMC: ∇U(x)=x (alias) must not mutate x" begin
+        # Regression test: previously `_velocity_jump_event_chain` normalized ∇U(x) in-place.
+        # If a user provided `∇U(x)=x`, that would corrupt the state `x`.
+        let dim = 10
+            ∇U_alias(x::Vector{Float64}) = x
+            sampler = ForwardECMC(dim, ∇U_alias; grid_size=10, tmax=1.0, mix_p=0.0, switch=true)
+            rng = MersenneTwister(123)
+            x = randn(dim)
+            x0 = copy(x)
+            v = randn(dim); v ./= norm(v)
+            v_new = sampler.velocity_jump(x, v, rng)
+            @test x == x0
+            @test all(isfinite.(v_new))
+        end
     end
 
     @testset "Manual gradient: no AD should leak Dual into ∇U" begin

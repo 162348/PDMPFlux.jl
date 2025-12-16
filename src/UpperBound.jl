@@ -93,12 +93,18 @@ function upper_bound_grid(func::Function, start::Float64, horizon::Float64, n_gr
     t = range(start, stop=horizon, length=n_grid)
     step_size = t[2] - t[1]  # jax と最後の桁の数値が違う
     
-    ## grid 上での値と微分係数の計算
-    values = map(func, t)  # その結果後ろの方では結構数値誤差が蓄積している可能性があるが，jax と Julia のどっちがより正しいかは不明．
+    values = map(func, t)
     if AD_backend == "ForwardDiff"
-        grads = [ForwardDiff.derivative(func, x) for x in t]
+        # Fast path: scalar derivative w.r.t. scalar t
+        # Fallback to finite differences if `func` is not Dual-compatible (e.g. user-provided ∇U only accepts Float64)
+        try
+            grads = [ForwardDiff.derivative(func, x) for x in t]
+        catch
+            grads = [finite_difference_derivative(func, Float64(x); start=start, horizon=horizon) for x in t]
+        end
     elseif AD_backend == "Zygote"
-        grads = [Zygote.gradient(func, x)[1][1] for x in t]
+        # Zygote.gradient(func, x) returns a 1-tuple for scalar x; the derivative is the first element.
+        grads = [Zygote.gradient(func, x)[1] for x in t]
     elseif AD_backend == "ReverseDiff"
         grads = [ReverseDiff.gradient(func, [x])[1] for x in t]
     elseif AD_backend == "Enzyme"
@@ -137,9 +143,13 @@ function upper_bound_grid_test(func::Function, start::Float64, horizon::Float64,
     ## grid 上での値と微分係数の計算
     values = map(func, t)  # その結果後ろの方では結構数値誤差が蓄積している可能性があるが，jax と Julia のどっちがより正しいかは不明．
     if AD_backend == "ForwardDiff"
-        grads = [ForwardDiff.derivative(func, x) for x in t]
+        try
+            grads = [ForwardDiff.derivative(func, x) for x in t]
+        catch
+            grads = [finite_difference_derivative(func, Float64(x); start=start, horizon=horizon) for x in t]
+        end
     elseif AD_backend == "Zygote"
-        grads = [Zygote.gradient(func, x)[1][1] for x in t]
+        grads = [Zygote.gradient(func, x)[1] for x in t]
     elseif AD_backend == "ReverseDiff"
         grads = [ReverseDiff.gradient(func, [x])[1] for x in t]
     elseif AD_backend == "Enzyme"
