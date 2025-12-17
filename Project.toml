@@ -1,11 +1,14 @@
 name = "PDMPFlux"
 uuid = "fa921718-cbf9-4165-aaee-7047d51b02b3"
-version = "0.4.4"
+version = "0.4.5"
 authors = ["Hirofumi Shiba"]
 
 [deps]
+CategoricalArrays = "324d7699-5711-5eae-9e2f-1d82baa6b597"
+DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
 ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
+JLD2 = "033835bb-8acc-5ee8-8aae-3f567f8a3819"
 LaTeXStrings = "b964fa9f-0449-5b57-a5c2-d3ea65f4040f"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 Optim = "429524aa-4258-5aef-a3af-852621145aeb"
@@ -21,8 +24,11 @@ Zygote = "e88e6eb3-aa80-5325-afca-941959d7151f"
 
 [compat]
 BenchmarkTools = "1.6.0"
+CategoricalArrays = "1.0.2"
+DataFrames = "1.8.1"
 Distributions = "0.25.112"
 ForwardDiff = "0.10.36, 1"
+JLD2 = "0.6.3"
 LaTeXStrings = "1.4.0"
 LinearAlgebra = "1.11.0"
 Optim = "1.9.4"

@@ -217,6 +217,48 @@ function _velocity_jump_event_chain_speed_up(x::Vector{Float64}, v::Vector{Float
     return v_out
 end
 
+function _velocity_jump_event_chain_normal(x::Vector{Float64}, v::Vector{Float64}, 
+    key::Random.AbstractRNG, ∇U, 
+    dim::Int, mix_p::Float64, ran_p::Bool,
+    switch::Bool, positive::Bool, speed_factor::Float64)::Vector{Float64}
+
+    # Generate a new radial speed
+    u = randn(key, 2)
+    ρ = speed_factor * -sqrt(abs2.(u))
+
+    # Compute normalized gradient direction (see the aliasing note in `_velocity_jump_event_chain`)
+    n = copy(∇U(x))
+    ng = norm(n)
+    if ng == 0
+        fill!(n, 0.0)
+    else
+        n ./= ng
+    end
+
+    # Decompose velocity into parallel and orthogonal components
+    vₚ = (v ⋅ n) * n  # Parallel component along gradient
+    vₒ = v - vₚ       # Orthogonal component
+
+    # Handle degenerate case where orthogonal component is too small
+    if norm(vₒ) < TOLERANCE
+        vₒ = randn(key, dim)
+        vₒ = vₒ .- (vₒ ⋅ n) * n
+    end
+
+    u2 = rand(key)
+    if u2 >= mix_p
+        # No refresh case - return early
+        v_out = vₒ / norm(vₒ) * sqrt(speed_factor^2 * sum(abs2.(vₒ)) - ρ^2) .+ ρ * n
+        return v_out
+    end
+
+    # Refresh case
+    vₒ_proposal = switch ? _orthogonal_switch(vₒ, n, key, ran_p, dim, positive) : _full_refresh(n, key, dim)
+    v_out = vₒ_proposal / norm(vₒ_proposal) * sqrt(speed_factor^2 * sum(abs2.(vₒ_proposal)) - ρ^2) .+ ρ * n
+
+    return v_out
+end
+
 mutable struct ForwardECMC{G,KF,KR,KRV,KSR,KSRV,KVJ} <: AbstractPDMP
   dim::Int
   ∇U::G
@@ -258,7 +300,7 @@ mutable struct ForwardECMC{G,KF,KR,KRV,KSR,KSRV,KVJ} <: AbstractPDMP
   """
   function ForwardECMC(dim::Int, ∇U::Function; grid_size::Int=10, tmax::Union{Float64, Int}=2.0,
     signed_bound::Bool=true, adaptive::Bool=true, ran_p::Bool=false, mix_p::Float64=0.5, switch::Bool=true,
-    positive::Bool=true, AD_backend::String="ForwardDiff",speed_factor::Float64=1.0)
+    positive::Bool=true, AD_backend::String="ForwardDiff",speed_factor::Float64=1.0, normal::Bool=false)
 
     # Input validation and preprocessing
     tmax = Float64(tmax)
@@ -280,7 +322,9 @@ mutable struct ForwardECMC{G,KF,KR,KRV,KSR,KSRV,KVJ} <: AbstractPDMP
     # Create rate function closures
     rate = (x0, v0, t) -> _global_rate(x0, v0, t, ∇U, flow)
     signed_rate = (x0, v0, t) -> _signed_rate(x0, v0, t, ∇U, flow)
-    if speed_factor > 1.0
+    if normal
+        velocity_jump = (x, v, key) -> _velocity_jump_event_chain_normal(x, v, key, ∇U, dim, mix_p, ran_p, switch, positive, speed_factor)
+    elseif speed_factor != 1.0
         velocity_jump = (x, v, key) -> _velocity_jump_event_chain_speed_up(x, v, key, ∇U, dim, mix_p, ran_p, switch, positive, speed_factor)
     else
         velocity_jump = (x, v, key) -> _velocity_jump_event_chain(x, v, key, ∇U, dim, mix_p, ran_p, switch, positive)
