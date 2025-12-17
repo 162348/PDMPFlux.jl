@@ -11,8 +11,16 @@ function jointplot(samples::Matrix{Float64}; coordinate_numbers=[1,2], histcolor
     return p
 end
 
-function marginalplot(samples::Matrix{Float64}; d::Int64, histcolor="#78C2AD", filename=nothing, with_kde::Bool=true,
-    bins=:auto, kdecolor="#E95420", linewidth=2, alpha=0.7, title=nothing, xlabel=nothing, ylabel="Density")
+function marginalplot(samples::Matrix{Float64}; d::Int64=1, histcolor="#78C2AD", filename=nothing, with_kde::Bool=true,
+    bins=:auto, kdecolor="#E95420", linewidth=2, alpha=0.7, title=nothing, xlabel=nothing, ylabel="Density", U::Union{Function, Nothing}=nothing)
+
+    dim = size(samples, 1)
+    if d > dim
+        throw(ArgumentError("d is greater than the number of dimensions of the samples"))
+    end
+    if d < 1
+        throw(ArgumentError("d is less than 1"))
+    end
     data = samples[d, :]
     
     # デフォルトのラベル設定
@@ -37,6 +45,15 @@ function marginalplot(samples::Matrix{Float64}; d::Int64, histcolor="#78C2AD", f
                 color=kdecolor,
                 linewidth=linewidth,
                 label="KDE")
+    end
+
+    if !isnothing(U)
+        marginal_density = function (x::Float64)
+            v = zeros(dim)
+            v[d] = x
+            return exp(-U(v))
+        end
+        plot!(p, marginal_density, color=:red, linewidth=linewidth, label="Target density")
     end
     
     xlabel!(p, xlabel)

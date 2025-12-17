@@ -12,12 +12,12 @@ Documentation for [PDMPFlux](https://github.com/162348/PDMPFlux.jl).
 ```@example
 using PDMPFlux
 
-function U_Gauss(x::AbstractVector)
-    return sum(x.^2) / 2
+function ∇U(x::AbstractVector)
+    return x
 end
 
 dim = 10
-sampler = BPSAD(dim, U_Gauss)
+sampler = ForwardECMC(dim, ∇U)
 
 N_sk, N, xinit, vinit = 20_000, 5_000, zeros(dim), ones(dim)
 samples = sample(sampler, N_sk, N, xinit, vinit, seed=2025)
@@ -36,10 +36,10 @@ end
 dim = 3
 sampler = ForwardECMCAD(dim, U_banana)
 
-N_sk, xinit, vinit = 20_000, zeros(dim), ones(dim)
-output = sample_skeleton(sampler, N_sk, xinit, vinit, seed=2025)
+N_sk, xinit, vinit, T_horizon = 20_000, zeros(dim), ones(dim), 1000.0
+output = sample_skeleton(sampler, T_horizon, xinit, vinit, seed=2025)
 
-plot_traj(output, 300, plot_type="3D")
+plot_traj(output, 50, plot_type="3D")
 ```
 
 ```@autodocs
