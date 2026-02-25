@@ -17,10 +17,11 @@ end
 """
     create_gradient_function(U::Function, dim::Int, AD_backend::String)::Function
 
-`U` の勾配関数 `∇U(x)` を生成する共通ヘルパ。
+Common helper to build a gradient function `∇U(x)` from `U`.
 
-- `x` は `AbstractVector` を想定
-- **常に長さ `dim` のベクトル勾配**を返す（`dim==1` で `U(::Real)` の場合も `[dU/dx]` を返す）
+- `x` is assumed to be an `AbstractVector`
+- Always returns a **vector gradient of length `dim`**
+  (even when `dim == 1` and the user provides `U(::Real)`, it returns `[dU/dx]`)
 """
 function create_gradient_function(U::Function, dim::Int, AD_backend::String)
   # NOTE:

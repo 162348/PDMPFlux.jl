@@ -10,31 +10,36 @@
 
     the argument `sampler` is only used to implement multiple dispatch.
 
-    state.accept が false である限り，one_step_of_thinning() を繰り返す．
-    state.accept が true になるには ac_step_with_proxy() → if_accept() が呼ばれる必要がある．
+    Repeats `one_step_of_thinning()` while `state.accept` is `false`.
+
+    For `state.accept` to become `true`, the call chain must reach
+    `ac_step_with_proxy()` → `if_accept()`.
 """
 function get_event_state(state::PDMPState, sampler::AbstractPDMP)::PDMPState
     return get_event_state!(state, sampler)
 end
 
 """
-    state.accept が false である限り実行する処理
-    moves_until_horizon() → ac_step_with_proxy() → if_accept() が呼ばれるまで繰り返す．
+    Execute one outer thinning step while `state.accept` is `false`.
+
+    Internally this repeats the chain `moves_until_horizon()` → `ac_step_with_proxy()` → `if_accept()`
+    until an event is accepted.
 """
 function one_step_of_thinning(state::PDMPState, sampler::AbstractPDMP)::PDMPState
     return one_step_of_thinning!(state, sampler)
 end
 
 """
-    tp > state.horizon の場合，もう一度 Poisson simulation を行う．
+    Case `tp > state.horizon`: advance the flow to the horizon (no event within the horizon).
 """
 function move_to_horizon(state::PDMPState, sampler::AbstractPDMP)::PDMPState
     return move_to_horizon!(state, sampler)
 end
 
 """
-    tp <= state.horizon の場合の処理
-    state.accept = true になるまでの ac_step() の繰り返しとして実装される．
+    Case `tp <= state.horizon`.
+
+    Implemented as repeated calls to `ac_step()` until `state.accept` becomes `true`.
 """
 function moves_until_horizon(state::PDMPState, sampler::AbstractPDMP)::PDMPState
     return moves_until_horizon!(state, sampler)
@@ -42,47 +47,53 @@ end
 
 """
     acceptance-rejection step
-    lambda_bar は正確な上界ではなく，grid が粗い場合に足りない可能性がある．
-    その場合は erroneous_acceptance_rate() で補正する．
+
+    `lambda_bar` is an *approximate* upper bound (e.g. when the grid is coarse it may be too small).
+    In that case we correct via `erroneous_acceptance_rate()`.
 """
 function ac_step(state::PDMPState, sampler::AbstractPDMP)::PDMPState
     return ac_step!(state, sampler)
 end
 
 """
-    代理上界 lambda_bar で足りなかった場合は horizon を縮めてより慎重に ac_step() を繰り返す．
-    state.adaptive = true の場合は，ここで horizon を恒久的に縮めておく．
+    Handle the case where the proxy bound `lambda_bar` was too small.
+
+    Shrinks the horizon and retries `ac_step()` more conservatively. If `state.adaptive == true`,
+    the horizon is permanently reduced here.
 """
 function erroneous_acceptance_rate(state::PDMPState, sampler::AbstractPDMP)::PDMPState
     return erroneous_acceptance_rate!(state, sampler)
 end
 
 """
-    代理上界 lambda_bar で足りた場合は，ここで簡単に Poisson 剪定を行う．
-    Poisson 剪定中に horizon を超えた場合は move_to_horizon2() を呼び出す．
+    Proxy-bound thinning step using `lambda_bar`.
+
+    If Poisson thinning crosses the horizon, calls `move_to_horizon2()`.
 """
 function ac_step_with_proxy(state::PDMPState, sampler::AbstractPDMP)::PDMPState
     return ac_step_with_proxy!(state, sampler)
 end
 
 """
-    代理上界 lambda_bar を用いた剪定で accept された場合の処置
-    ここで one_step_of_thinning() を終了するために accept = true とされる．
+    Action taken when a proposal is accepted under proxy-bound thinning.
+
+    Sets `accept = true` to terminate `one_step_of_thinning()`.
 """
 function if_accept(state::PDMPState, sampler::AbstractPDMP)::PDMPState
     return if_accept!(state, sampler)
 end
 
 """
-    代理上界 lambda_bar を用いた剪定で accept されなかった場合の処置
-    horizon を超えるまで Poisson 剪定を繰り返す．
+    Action taken when a proposal is rejected under proxy-bound thinning.
+
+    Repeats Poisson thinning until the horizon is exceeded.
 """
 function if_reject(state::PDMPState, sampler::AbstractPDMP)::PDMPState
     return if_reject!(state, sampler)
 end
 
 """
-    代理上界 lambda_bar を使った Poisson 剪定中に horizon を超えた場合の動き
+    Action taken when Poisson thinning with proxy bound `lambda_bar` exceeds the horizon.
 """
 function move_to_horizon2(state::PDMPState, sampler::AbstractPDMP)::PDMPState
     return move_to_horizon2!(state, sampler)

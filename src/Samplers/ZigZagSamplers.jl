@@ -6,31 +6,31 @@ using Distributions
         vectorized_bound::Bool=true, signed_bound::Bool=true, adaptive::Bool=true, kwargs...)
 
 # arguments for constructor
-- `dim::Int`: 空間の次元。
-- `∇U::Function`: ポテンシャルエネルギー関数の勾配。
-- `grid_size::Int`: 空間を離散化するためのグリッドポイントの数。デフォルトは10。
-- `tmax::Float64`: グリッドのホライズン。デフォルトは1.0。0の場合、適応的なtmaxが使用されます。
-- `vectorized_bound::Bool`: 境界にベクトル化された戦略を使用するかどうか。デフォルトはtrue。
-- `signed_bound::Bool`: 符号付き境界戦略を使用するかどうか。デフォルトはtrue。
-- `adaptive::Bool`: 適応的なtmaxを使用するかどうか。デフォルトはtrue。
-- `kwargs...`: その他のキーワード引数。
+- `dim::Int`: dimension of the state space
+- `∇U::Function`: gradient of the potential energy function
+- `grid_size::Int`: number of grid points used for upper-bound discretization (default: 10)
+- `tmax::Float64`: bound horizon (default: 1.0). If set to 0, `tmax` is chosen adaptively.
+- `vectorized_bound::Bool`: whether to use a vectorized bound strategy (default: true)
+- `signed_bound::Bool`: whether to use signed-rate bound strategies (default: true)
+- `adaptive::Bool`: whether to adapt the horizon during sampling (default: true)
+- `kwargs...`: additional keyword arguments
 
 # attributes of a ZigZag construct
-- `dim::Int`: 空間の次元。
-- `refresh_rate::Float64`: リフレッシュレート。
-- `∇U::Function`: ポテンシャルの勾配。
-- `grid_size::Int`: 空間を離散化するためのグリッドポイントの数。
-- `tmax::Float64`: グリッドのtmax。
-- `adaptive::Bool`: 適応的なtmaxを使用するかどうか。
-- `vectorized_bound::Bool`: ベクトル化された戦略を使用するかどうか。
-- `signed_bound::Bool`: 符号付き戦略を使用するかどうか。
-- `flow::Function`: インテグレータ関数。
-- `rate::Array`: プロセスのレート。
-- `rate_vect::Array`: ベクトル化されたレート。
-- `signed_rate::Array`: 符号付きレート。
-- `signed_rate_vect::Array`: ベクトル化され符号付きのレート。
-- `velocity_jump::Function`: 速度ジャンプ関数。
-- `state`: ZigZagサンプラーの状態。
+- `dim::Int`: dimension of the state space
+- `refresh_rate::Float64`: refresh rate (currently unused for ZigZag)
+- `∇U::Function`: gradient of the potential
+- `grid_size::Int`: number of grid points used for upper-bound discretization
+- `tmax::Float64`: bound horizon
+- `adaptive::Bool`: whether to adapt the horizon during sampling
+- `vectorized_bound::Bool`: whether a vectorized bound strategy is used
+- `signed_bound::Bool`: whether signed-rate strategies are used
+- `flow::Function`: deterministic flow / integrator
+- `rate`: scalar (unsigned) event rate
+- `rate_vect`: vectorized (unsigned) event rate
+- `signed_rate`: scalar signed event rate (if used)
+- `signed_rate_vect`: vectorized signed event rate (if used)
+- `velocity_jump::Function`: velocity update at events
+- `state`: sampler state
 """
 mutable struct ZigZag{G,KF,KR,KRV,KSR,KSRV,KVJ} <: AbstractPDMP
     dim::Int

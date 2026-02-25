@@ -1,7 +1,7 @@
 """
     Core sampling functions for PDMPs, such as
 
-    - sample(): sample_skeleton() と sample_from_skeleton() の連続適用
+    - sample(): sequential application of `sample_skeleton()` and `sample_from_skeleton()`
     - sample_skeleton()
     - sample_from_skeleton()
 """
@@ -9,8 +9,9 @@
 using ProgressBars
 
 """
-    sample()：PDMPSampler からサンプルをするための関数．
-    sample_skeleton() と sample_from_skeleton() の wrapper．
+    sample(): draw samples from a `AbstractPDMP` sampler.
+
+    This is a thin wrapper that calls `sample_skeleton()` and then `sample_from_skeleton()`.
 
     Args:
         N_sk (Int): Number of skeleton points to generate.
@@ -57,7 +58,7 @@ function sample(
 end
 
 """
-    sample_skeleton(): PDMP Samplers からスケルトンを抽出する．
+    sample_skeleton(): generate a PDMP skeleton (event times/states) from a PDMP sampler.
 
     Parameters:
     - n_sk (Int): The number of skeleton samples to generate.
@@ -83,17 +84,17 @@ function sample_skeleton(
     end
 
     d = length(xinit)
-    # CI/テスト環境では進捗バーが warning を出すことがあるので、対話環境のみ有効化する
+    # In CI/test environments the progress bar can emit warnings, so only enable it in interactive sessions.
     iter = (verbose && isinteractive()) ? ProgressBar(1:n_sk, unit="B", unit_scale=true) : 1:n_sk
 
     state = init_state(sampler, xinit, vinit, seed)  # initializing sampler
     history = PDMPHistory(d, n_sk)  # initialize history
     record!(history, 1, state, d)
     
-    # 1列目は初期状態で埋めたので 2 から記録する
+    # Column 1 is already filled with the initial state, so record starting from 2.
     for k in Base.Iterators.drop(iter, 1)
-        # StickyPDMP は `get_event_state(::PDMPState, ::StickyPDMP)` に別実装があるため、
-        # ここでは public API の non-`!` 版を呼んで multiple dispatch させる。
+        # StickyPDMP has a specialized `get_event_state(::PDMPState, ::StickyPDMP)`,
+        # so call the public non-`!` API to trigger multiple dispatch.
         state = get_event_state(state, sampler)  # go to SamplingLoop.jl or StickySamplingLoop.jl
         record!(history, k, state, d)
     end
@@ -118,7 +119,7 @@ function sample_skeleton(
         throw(ArgumentError("n_sk must be positive. Current value: $N"))
     end
 
-    # NaN/Inf値の検証を追加
+    # Validate NaN/Inf in initial values
     if !isfinite(xinit) || !isfinite(vinit)
         throw(ArgumentError("initial values contain NaN, Inf, or -Inf."))
     end
@@ -132,12 +133,12 @@ end
 """
     sample_skeleton(sampler::AbstractPDMP, T::Float64, xinit, vinit; seed, verbose, init_capacity)
 
-`n_sk` ではなく「時刻 `T` まで」PDMP を進めてスケルトンを返す版。
+Time-horizon variant: advance the PDMP up to time `T` (instead of generating `n_sk` events) and return the skeleton.
 
-- 事前にイベント数は分からないため、`PDMPHistory` は `init_capacity` で確保し、
-  以降は必要に応じて倍々に拡張（copy）する。
-- 返り値は `t[end] == T` になるように、最後に deterministic flow で `t=T` の点を 1 点追加する
-  （`sample_from_skeleton` が `t[end]` を時間スケールとして使うため）。
+- Since the number of events is not known a priori, `PDMPHistory` is allocated with `init_capacity`
+  and grown by doubling as needed (with copying).
+- The return value is forced to satisfy `t[end] == T` by adding one final point at `t=T`
+  via deterministic flow (because `sample_from_skeleton` uses `t[end]` as the time scale).
 """
 function sample_skeleton(
     sampler::AbstractPDMP,
@@ -170,13 +171,13 @@ function sample_skeleton(
         last_pct = 0
     end
 
-    # T==0 の場合は初期点だけで十分
+    # If T==0, the initial point alone is sufficient.
     if T == 0.0
         sampler.state = state
         return _trim_history(history, d, k)
     end
 
-    # 直前状態の退避（overshoot した場合に flow で t=T の点を作るため）
+    # Save the previous state (used to create the final t=T point via flow if we overshoot).
     x_prev = similar(state.x)
     v_prev = similar(state.v)
     active_prev = BitVector(undef, d)
@@ -201,7 +202,7 @@ function sample_skeleton(
             end
             record!(history, k, state, d)
         else
-            # overshoot: 直前点から flow で t=T の点を作って追加し、そこで打ち切る
+            # Overshoot: create and append the t=T point via flow from the previous state, then stop.
             τ = T - t_prev
             if sampler isa StickyPDMP
                 @inbounds for i in 1:d
@@ -218,14 +219,14 @@ function sample_skeleton(
             @inbounds for i in 1:d
                 state.is_active[i] = active_prev[i]
             end
-            # record! が参照する統計量は「非イベント点」なので 0 埋めにしておく
+            # `record!` expects these statistics at "non-event" points, so fill with zeros.
             state.ar = 0.0
             state.errored_bound = 0
             fill!(state.error_value_ar, 0.0)
             state.rejected = 0
             state.hitting_horizon = 0
 
-            # v_active の整合性も保つ
+            # Keep v_active consistent too.
             @inbounds for i in 1:d
                 state.v_active[i] = state.is_active[i] ? state.v[i] : 0.0
             end
@@ -282,7 +283,7 @@ function sample_skeleton(
 end
 
 """
-    スケルトンからサンプリングをし，各行ベクトルに次元毎の時系列が格納された Matrix{Float64} を返す．
+    Sample along a skeleton and return a `Matrix{Float64}` whose rows store per-dimension time series.
 
     Args:
         N (Int): The number of samples to generate.
@@ -380,7 +381,7 @@ function sample_from_skeleton(sampler::StickyPDMP, N::Int, history::PDMPHistory;
 end
 
 """
-    スケルトンからサンプリングをし，各行ベクトルに次元毎の時系列が格納された Matrix{Float64} を返す．
+    Sample along a skeleton and return a `Matrix{Float64}` whose rows store per-dimension time series.
 
     Args:
         dt (Float64): The time step.
@@ -398,7 +399,7 @@ function sample_from_skeleton(
     return _sample_from_skeleton_impl(sampler, dt, history, discard_vt, false)
 end
 
-# sticky だけ active を使う版
+# Sticky version that respects `is_active`.
 function sample_from_skeleton(
     sampler::StickyPDMP,
     dt::Float64,

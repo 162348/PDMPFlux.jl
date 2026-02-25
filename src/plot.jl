@@ -23,7 +23,7 @@ function marginalplot(samples::Matrix{Float64}; d::Int64=1, histcolor="#78C2AD",
     end
     data = samples[d, :]
     
-    # デフォルトのラベル設定
+    # Default label settings
     if isnothing(xlabel)
         xlabel = "x_$d"
     end
@@ -37,7 +37,7 @@ function marginalplot(samples::Matrix{Float64}; d::Int64=1, histcolor="#78C2AD",
               bins=bins,
               color=histcolor,
               alpha=alpha,
-              normalize=:pdf,  # 密度として正規化
+              normalize=:pdf,  # Normalize as a density
               label="Histogram")
     
     if with_kde

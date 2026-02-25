@@ -8,11 +8,11 @@ abstract type AbstractPDMP end
 """
     _pdmp_ad_backend(pdmp) -> String
 
-PDMP 内部で上界計算（`upper_bound_grid*`）に使う AD backend を決める。
+Choose the AD backend used for upper-bound computations (`upper_bound_grid*`) inside a PDMP.
 
-- `pdmp` が `AD_backend` フィールドを持つ場合はそれを優先
-- `"Undefined"` や空文字は安全側に倒して `"FiniteDiff"` を選ぶ
-- フィールドが無い場合も `"FiniteDiff"` をデフォルトにする
+- If `pdmp` has an `AD_backend` field, it is preferred.
+- `"Undefined"` or an empty string is treated conservatively as `"FiniteDiff"`.
+- If the field does not exist, defaults to `"FiniteDiff"`.
 
 """
 function _pdmp_ad_backend(pdmp)::String
@@ -28,30 +28,33 @@ function _pdmp_ad_backend(pdmp)::String
 end
 
 """
-    ダイナミクスが抽象化された PDMP でサンプリングを行うための抽象構造体
+    Abstract PDMP sampler type.
 
-    属性:
-        dim::Int: 空間の次元。
-        refresh_rate::Float64: リフレッシュレート。
-        ∇U::Function: ポテンシャルの勾配。
-        grid_size::Int: 空間を離散化するためのグリッドポイントの数。
-        tmax::Float64: グリッドの最大時間。
-        adaptive::Bool: 適応的なtmaxを使用するかどうか。
-        vectorized_bound::Bool: ベクトル化された戦略を使用するかどうか。
-        signed_bound::Bool: 符号付き戦略を使用するかどうか。
-        flow::Function: インテグレータ関数。
-        rate::Array: プロセスのレート。
-        rate_vect::Array: ベクトル化されたレート。
-        signed_rate::Array: 符号付きレート。
-        signed_rate_vect::Array: ベクトル化され符号付きのレート。
-        velocity_jump::Function: 速度ジャンプ関数。
-        state::Any: ZigZagサンプラーの状態。
-    メソッド:
-        init_state(xinit::Array{Float64,1}, vinit::Array{Float64,1}, seed::Int) -> PdmpState:
-        sample_skeleton(n_sk::Int, xinit::Array{Float64,1}, vinit::Array{Float64,1}, seed::Int, verbose::Bool=true) -> PdmpOutput:
-        sample_from_skeleton(N::Int, output::PdmpOutput) -> Array{Float64,2}:
-        sample(N_sk::Int, N_samples::Int, xinit::Array{Float64,1}, vinit::Array{Float64,1}, seed::Int, verbose::Bool=true) -> Array{Float64,2}:
-        _init_bps_rate() -> Tuple{Function, Nothing, Function, Nothing}:
+    This docstring describes the common fields and methods expected from samplers that
+    subtype `AbstractPDMP`.
+
+    Common fields (by convention):
+        dim::Int: dimension of the state space
+        refresh_rate::Float64: refresh rate (if used by the sampler)
+        ∇U::Function: gradient of the potential
+        grid_size::Int: number of grid points used for discretizing time in upper bounds
+        tmax::Float64: default horizon / maximum time for the bound grid
+        adaptive::Bool: whether to adapt the horizon during sampling
+        vectorized_bound::Bool: whether the bound strategy is vectorized
+        signed_bound::Bool: whether signed-rate strategies are used
+        flow::Function: deterministic flow / integrator
+        rate::Function: (unsigned) event rate
+        rate_vect::Function: vectorized event rate (if applicable)
+        signed_rate::Function: signed event rate (if applicable)
+        signed_rate_vect::Function: vectorized signed event rate (if applicable)
+        velocity_jump::Function: velocity update at events
+        state::Any: sampler state (often `PDMPState` or `nothing`)
+
+    Common methods:
+        init_state(pdmp, xinit, vinit, seed) -> PDMPState
+        sample_skeleton(pdmp, n_sk, xinit, vinit; seed, verbose) -> PDMPHistory
+        sample_from_skeleton(pdmp, N, history) -> Matrix{Float64}
+        sample(pdmp, N_sk, N_samples, xinit, vinit; seed, verbose) -> Matrix{Float64}
 """
 # struct PDMP <: AbstractPDMP
 #     dim::Int
@@ -73,7 +76,7 @@ end
 
 """
     init_state():
-    PDMP オブジェクトの状態を初期化する．
+    Initialize and attach a `PDMPState` to a PDMP sampler.
 
     Args:
         xinit (Float[Array, "dim"]): The initial position.
@@ -89,15 +92,15 @@ end
 """
 function init_state(pdmp::AbstractPDMP, xinit::AbstractVector{Float64}, vinit::AbstractVector{Float64}, seed::Union{Int, Nothing}=nothing)
 
-    # xinit と vinit の次元が pdmp.dim に一致するか確認
+    # Check that xinit and vinit match pdmp.dim
     if length(xinit) != pdmp.dim || length(vinit) != pdmp.dim
-        throw(DimensionMismatch("xinit と vinit の次元は pdmp.dim ($(pdmp.dim)) と一致する必要があります。現在の次元: xinit ($(length(xinit))), vinit ($(length(vinit)))"))
+        throw(DimensionMismatch("xinit and vinit must have the same dimension as pdmp.dim ($(pdmp.dim)). Current dimensions: xinit ($(length(xinit))), vinit ($(length(vinit)))"))
     end
 
     rng = seed === nothing ? Random.default_rng() : Random.MersenneTwister(seed)
     pdmp.rng = rng
 
-    # rate, rate_vect, refresh_rate の設定は signed_bound に依存して異なる
+    # rate / rate_vect / refresh_rate depend on signed_bound
     if pdmp.signed_bound
         rate = pdmp.signed_rate
         rate_vect = pdmp.signed_rate_vect
@@ -114,10 +117,10 @@ function init_state(pdmp::AbstractPDMP, xinit::AbstractVector{Float64}, vinit::A
 
     ad_backend = _pdmp_ad_backend(pdmp)
 
-    # グリッドサイズが0の場合、Brentのアルゴリズムを使用して定数上限戦略を使用
+    # If grid_size == 0, use a constant-bound strategy via Brent's method
     if pdmp.grid_size == 0
         upper_bound_func = function(x, v, horizon)
-            func = t -> pdmp.rate(x, v, t)  # pdmp.signed_bound のフラッグに依らず，符号なしの pdmp.rate を用いる．
+            func = t -> pdmp.rate(x, v, t)  # Always use the unsigned rate here (independent of pdmp.signed_bound).
             return upper_bound_constant(func, 0.0, horizon)
         end
     elseif !pdmp.vectorized_bound

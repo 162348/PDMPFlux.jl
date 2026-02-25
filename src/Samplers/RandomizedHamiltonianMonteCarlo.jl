@@ -197,7 +197,7 @@ function init_state(
     seed::Union{Int,Nothing}=nothing,
 )
     if length(xinit) != pdmp.dim || length(vinit) != pdmp.dim
-        throw(DimensionMismatch("xinit と vinit の次元は pdmp.dim ($(pdmp.dim)) と一致する必要があります。現在の次元: xinit ($(length(xinit))), vinit ($(length(vinit)))"))
+        throw(DimensionMismatch("xinit and vinit must have the same dimension as pdmp.dim ($(pdmp.dim)). Current dimensions: xinit ($(length(xinit))), vinit ($(length(vinit)))"))
     end
 
     rng = seed === nothing ? Random.default_rng() : Random.MersenneTwister(seed)

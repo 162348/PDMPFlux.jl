@@ -190,7 +190,7 @@ function if_reject!(state::PDMPState, sampler::AbstractPDMP)::PDMPState
     exp_rv = state.exp_rv + randexp(sampler.rng)
     tp, lambda_bar = next_event(state.upper_bound, exp_rv)
 
-    # adaptive = true の場合は horizon を縮める
+    # If adaptive = true, shrink the horizon
     state.horizon = state.adaptive ? state.horizon / 1.04 : state.horizon
 
     state.tp = tp

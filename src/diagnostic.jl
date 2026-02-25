@@ -1,4 +1,4 @@
-using StatsPlots  # histogram() など．
+using StatsPlots  # histogram(), etc.
 using Plots
 
 function diagnostic(history::PDMPHistory; color="#78C2AD", background="#FFF", linewidth=2)
@@ -84,23 +84,23 @@ function plot_traj!(p, history::PDMPHistory, N_max::Int; plot_type="2D", color="
 end
 
 """
-既存の plot に U の等高線を追加する関数
+Create a contour plot of the potential function `U` (2D).
 
 # Arguments
-- `U`: ポテンシャル関数（2次元ベクトルを受け取る）
-- `x_range`: x方向の範囲（デフォルト: -5:0.1:5）
-- `y_range`: y方向の範囲（デフォルト: -5:0.1:5）
-- `levels`: 等高線のレベル数（デフォルト: 20）
-- `color`: カラーパレット（デフォルト: :viridis）
-- `fill`: 等高線を塗りつぶすかどうか（デフォルト: true）
-- `show_grid`: グリッドを表示するか（デフォルト: false）
-- `show_axis`: 軸の目盛りを表示するか（デフォルト: false）
-- `show_title`: タイトルを表示するか（デフォルト: false）
-- `xlabel`: x軸のラベル（デフォルト: L"x_1"）
-- `ylabel`: y軸のラベル（デフォルト: L"x_2"）
-- `background`: 背景色（デフォルト: :white）
-- `linewidth`: 等高線の線幅（デフォルト: 1）
-- `filename`: 保存するファイル名（デフォルト: nothing）
+- `U`: potential function taking a 2D vector
+- `x_range`: range for the x-axis (default: `range(-5, 5, length=100)`)
+- `y_range`: range for the y-axis (default: `range(-5, 5, length=100)`)
+- `levels`: number of contour levels (default: 20)
+- `color`: color palette (default: `:viridis`)
+- `fill`: whether to fill contours (default: true)
+- `show_grid`: show grid (default: false)
+- `show_axis`: show axis ticks/labels (default: false)
+- `show_title`: show title (default: false)
+- `xlabel`: x-axis label (default: `L"x_1"`)
+- `ylabel`: y-axis label (default: `L"x_2"`)
+- `background`: background (default: `:transparent`)
+- `linewidth`: contour line width (default: 1)
+- `filename`: output filename to save (default: `nothing`)
 """
 function plot_U_contour(U;
     x_range = range(-5, 5, length=100),
@@ -117,10 +117,10 @@ function plot_U_contour(U;
     linewidth = 1,
     filename = nothing)
     
-    # グリッド上でUの値を計算
+    # Compute U values on the grid
     Z = [U([x, y]) for x in x_range, y in y_range]
     
-    # プロットを作成
+    # Create the plot
     p = contour(x_range, y_range, Z,
         levels = levels,
         color = color,
@@ -173,8 +173,8 @@ function anim_traj(history::PDMPHistory, N_max::Int; N_start::Int=1, plot_start:
             kwargs...
             )
         args = dynamic_range ? (; args..., xlims=nothing, ylims=nothing) : args
-        traj = traj[1,:]  # Vector に変換しないと @animate に掛かる時間が 10 倍くらいになる
-        # times = collect(Float64, 1:length(traj))  # なぜか Float64 にしないと @animate 内の push! エラー oundsError: attempt to access 2-element Vector{Plots.Series} at index [3] が出る
+        traj = traj[1,:]  # Convert to Vector; otherwise @animate can be ~10x slower.
+        # times = collect(Float64, 1:length(traj))  # NOTE: using Float64 avoided a push! BoundsError inside @animate in the past.
 
         # maximum number of events to be plotted
         upper_limit = min(length(traj), frame_upper_limit)
@@ -324,8 +324,8 @@ function anim_traj_(history::PDMPHistory, N_max::Int; N_start::Int=1, plot_start
             kwargs...
             )
         args = dynamic_range ? (; args..., xlims=nothing, ylims=nothing) : args
-        traj = traj[1,:]  # Vector に変換しないと @animate に掛かる時間が 10 倍くらいになる
-        # times = collect(Float64, 1:length(traj))  # なぜか Float64 にしないと @animate 内の push! エラー oundsError: attempt to access 2-element Vector{Plots.Series} at index [3] が出る
+        traj = traj[1,:]  # Convert to Vector; otherwise @animate can be ~10x slower.
+        # times = collect(Float64, 1:length(traj))  # NOTE: using Float64 avoided a push! BoundsError inside @animate in the past.
 
         # maximum number of events to be plotted
         upper_limit = min(length(traj), frame_upper_limit)
@@ -585,7 +585,7 @@ function anim_traj_(history::PDMPHistory, N_max::Int; N_start::Int=1, plot_start
 end
 
 """
-    traj_for_animation(): アニメーション用の軌道を抽出する．
+    traj_for_animation(): extract a trajectory for animation.
 
     Parameters:
     - trajectory (Matrix{Float64}): The trajectory to be animated.

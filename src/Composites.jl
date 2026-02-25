@@ -4,7 +4,7 @@ using StaticArrays
 """
     BoundBox <: Any
 
-    上界関数の出力を格納するための構造体．
+    Container for outputs of an upper-bound function.
 
     Attributes:
         grid (Float64 Array{T,1}): The grid values.
@@ -23,7 +23,7 @@ end
 """
     PDMPState <: Any
 
-    AbstractPDMP の状態空間の元．次のフィールドを持つ構造体として実装：
+    A state in the state space of an `AbstractPDMP`, implemented as a struct with the fields below.
 
     Attributes:
         x (AbstractVector{T}): position
@@ -53,7 +53,8 @@ end
         hitting_horizon (Int): count of the number of hits of the horizon
         
     Note:
-        `flow/∇U/rate/velocity_jump/rng` は sampler 側に持たせ，state は「状態」(x,v,t,...) に集中させる．
+        Keep `flow/∇U/rate/velocity_jump/rng` on the sampler side, and keep `PDMPState` focused on
+        the evolving state variables `(x, v, t, ...)`.
 """
 mutable struct PDMPState{T,TX<:AbstractVector{T},TV<:AbstractVector{T},TA<:AbstractVector{Bool},TF} <: Any
     x::TX
@@ -73,7 +74,7 @@ mutable struct PDMPState{T,TX<:AbstractVector{T},TV<:AbstractVector{T},TA<:Abstr
     lambda_bar::T  # upper bound for the rate function, calculated from `BoundBox`
     lambda_t::T
     ar::T  # acceptance rate
-    errored_bound::Int  # 代理上界で足りなかった回数
+    errored_bound::Int  # number of times the proxy bound was insufficient
     error_value_ar::MVector{5,T}  # fixed-length ring buffer of recent erroneous ARs
     rejected::Int
     hitting_horizon::Int  # the total times of hitting the horizon
@@ -138,8 +139,8 @@ struct PDMPHistory{T}
     X::Matrix{T}              # d × n
     V::Matrix{T}              # d × n
     t::Vector{T}              # n
-    is_active::BitMatrix      # d × n（メモリ最小。速度優先なら Matrix{Bool} でもOK）
-    horizon::Vector{T}        # n（一定なら scalar 化も可）
+    is_active::BitMatrix      # d × n (min memory; use Matrix{Bool} if speed is preferred)
+    horizon::Vector{T}        # n (could be scalar if constant)
     ar::Vector{T}             # n
     errored_bound::Vector{Int32}
     error_value_ar::Matrix{T} # 5 × n
@@ -223,7 +224,7 @@ end
 # Backward-compatible properties: expose `.x` / `.v` as column iterators
 function Base.getproperty(h::PDMPHistory, name::Symbol)
     if name === :x
-        # テストやユーザコードが `Vector{Float64}`（copy）を期待するので view を返さない
+        # Tests/user code may expect `Vector{Float64}` (a copy), so don't return views.
         return map(copy, eachcol(getfield(h, :X)))
     elseif name === :v
         return map(copy, eachcol(getfield(h, :V)))
@@ -233,10 +234,10 @@ function Base.getproperty(h::PDMPHistory, name::Symbol)
 end
 
 """
-    PDMPHistory オブジェクトに PDMPState オブジェクトから必要なフィールドを追記するメソッド
+    Record the current `PDMPState` into a `PDMPHistory` at index `k`.
 """
 @inline function record!(h::PDMPHistory{T}, k::Int, s::PDMPState, d::Int) where {T}
-    # X, V は列メジャーなのでオフセットで一気に copyto!
+    # X, V are column-major; copy the contiguous block via an offset.
     off = (k-1)*d + 1
     @inbounds begin
         copyto!(h.X, off, s.x, 1, d)
@@ -245,7 +246,7 @@ end
         h.horizon[k] = s.horizon
         h.ar[k] = s.ar
         h.errored_bound[k] = Int32(s.errored_bound)
-        # error_value_ar は長さ5固定にしておく（後述）
+        # Keep `error_value_ar` at fixed length 5.
         for j in 1:5
             h.error_value_ar[j, k] = s.error_value_ar[j]
         end

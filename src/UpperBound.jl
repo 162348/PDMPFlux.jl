@@ -3,7 +3,7 @@ using Optim
 """
     upper_bound_constant(func, a, b, n_grid=100, refresh_rate=0.0)
     Computes the constant upper bound using the Brent's algorithm.
-    Brent のアルゴリズムを通じて定数でバウンドすることを試みる．必然的に n_grid=2．
+    Attempts to bound `func` by a single constant via Brent's method (effectively `n_grid = 2`).
 
     Parameters:
     - func: The function for which the upper bound constant is computed.
@@ -25,7 +25,7 @@ function upper_bound_constant(func::Function, start::Union{Float64,Int}, horizon
     
     # Create the grid and calculate box_max
     t = collect(LinRange(start, horizon, 2))  # collect() into Vector{Float64}
-    box_max = [-Optim.minimum(result)]  #? Optim.minimum の型はわからないよな？ → func は rate の partial であり，非負値である．
+    box_max = [-Optim.minimum(result)]  # NOTE: `func` is a partial rate and should be non-negative.
     box_max[1] += refresh_rate
     
     # Calculate cumulative sum
@@ -41,10 +41,11 @@ using Zygote, ReverseDiff
 """
     finite_difference_derivative(func, x; start=-Inf, horizon=Inf)
 
-数値微分（有限差分）で `d/dx func(x)` を近似する。
+Approximate `d/dx func(x)` using finite differences.
 
-- `func` は `Float64 -> Real` だけでなく `Float64 -> AbstractArray` も許す（要素ごとに差分を取る）。
-- `start`/`horizon` を与えると境界の外に出ないように差分幅を調整する。
+- `func` may return either a scalar (`Float64 -> Real`) or an array (`Float64 -> AbstractArray`);
+  in the latter case, differences are taken element-wise.
+- If `start`/`horizon` are provided, the step size is adjusted to stay within bounds.
 """
 function finite_difference_derivative(
     func::Function,
@@ -53,18 +54,18 @@ function finite_difference_derivative(
     horizon::Float64 = Inf,
 )
     fx = func(x)
-    # sqrt(eps) スケールのステップ（x=0 近傍も安定化）
+    # Step size at sqrt(eps) scale (stabilizes near x=0).
     h = sqrt(eps(Float64)) * max(1.0, abs(x))
 
     x_minus = max(start, x - h)
     x_plus  = min(horizon, x + h)
 
-    # 退化ケース（区間が潰れた等）: 形だけゼロを返す
+    # Degenerate case (e.g. collapsed interval): return a zero-shaped value.
     if x_plus == x_minus
         return fx .- fx
     end
 
-    # 端点近傍では片側差分にフォールバック
+    # Near the boundary, fall back to one-sided differences.
     if x_minus == x
         return (func(x_plus) - fx) / (x_plus - x)
     elseif x_plus == x
@@ -89,9 +90,9 @@ end
         BoundBox: An object containing the upper bound constant information.
 """
 function upper_bound_grid(func::Function, start::Float64, horizon::Float64, n_grid::Int=100, refresh_rate::Float64 = 0.0; AD_backend::String="FiniteDiff")::BoundBox
-    # grid の生成
+    # Grid construction
     t = range(start, stop=horizon, length=n_grid)
-    step_size = t[2] - t[1]  # jax と最後の桁の数値が違う
+    step_size = t[2] - t[1]  # May differ in the last digits vs JAX due to FP details.
     
     values = map(func, t)
     if AD_backend == "ForwardDiff"
@@ -136,12 +137,12 @@ function upper_bound_grid(func::Function, start::Float64, horizon::Float64, n_gr
 end
 
 function upper_bound_grid_test(func::Function, start::Float64, horizon::Float64, n_grid::Int=100, refresh_rate::Float64 = 0.0; AD_backend::String="FiniteDiff")::BoundBox
-    # grid の生成
+    # Grid construction
     t = range(start, stop=horizon, length=n_grid)
-    step_size = t[2] - t[1]  # jax と最後の桁の数値が違う
+    step_size = t[2] - t[1]  # May differ in the last digits vs JAX due to FP details.
     
-    ## grid 上での値と微分係数の計算
-    values = map(func, t)  # その結果後ろの方では結構数値誤差が蓄積している可能性があるが，jax と Julia のどっちがより正しいかは不明．
+    ## Values and derivatives on the grid
+    values = map(func, t)  # Numerical error may accumulate; it's unclear whether JAX or Julia is "more correct".
     if AD_backend == "ForwardDiff"
         try
             grads = [ForwardDiff.derivative(func, x) for x in t]
@@ -248,8 +249,10 @@ end
 
 """
     next_event(boundbox, exp_rv):
-    BoundBox オブジェクトを用いて次のイベント時間を Poisson 剪定によりシミュレーションする．
-    イベント時刻 t_prop とその直前の grid 点での上界の値を返す．
+    Simulate the next event time by Poisson thinning using a `BoundBox`.
+
+    Returns the proposed event time `t_prop` and the upper-bound value on the grid interval
+    immediately before `t_prop`.
 
     Args:
         boundbox: The boundbox object containing the cumulative sum and grid values.
