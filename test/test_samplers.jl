@@ -198,4 +198,68 @@ using PDMPFlux
         @test all(isfinite.(hcat(output.x...)))
         @test all(isfinite.(hcat(output.v...)))
     end
+
+    @testset "RHMC Sampler" begin
+        # 1次元ガウシアンでのテスト（exact-flow なら厳密、ここでは数値積分近似なので緩く検証）
+        function ∇U_Gauss_1D(x::AbstractVector)
+            return [x[1]]
+        end
+
+        dim = 1
+        sampler = RHMC(
+            dim,
+            ∇U_Gauss_1D;
+            mean_duration=1.0,
+            phi=pi/2,
+            step_size=0.01,
+            tmax=10.0,
+            adaptive=false,
+        )
+
+        N_sk = 2000
+        xinit = 0.0
+        vinit = 0.0
+        seed = 123
+
+        hist = sample_skeleton(sampler, N_sk, xinit, vinit, seed=seed, verbose=false)
+        @test length(hist.t) == N_sk
+        @test all(isfinite.(hist.t))
+        @test all(isfinite.(hcat(hist.x...)))
+        @test all(isfinite.(hcat(hist.v...)))
+
+        N = 2000
+        samples = sample_from_skeleton(sampler, N, hist)
+        @test size(samples, 1) == dim
+        @test size(samples, 2) == N
+        @test all(isfinite.(samples))
+
+        sample_mean = mean(samples)
+        sample_var = var(samples)
+        @test abs(sample_mean) < 0.5
+        @test 0.5 < sample_var < 2.0
+    end
+
+    @testset "RHMCAD Sampler" begin
+        function U_Gauss_1D(x::AbstractVector)
+            return sum(x.^2) / 2
+        end
+
+        dim = 1
+        sampler = RHMCAD(
+            dim,
+            U_Gauss_1D;
+            AD_backend="Zygote",
+            mean_duration=1.0,
+            phi=pi/2,
+            step_size=0.01,
+            tmax=10.0,
+            adaptive=false,
+        )
+
+        hist = sample_skeleton(sampler, 200, 0.0, 0.0, seed=456, verbose=false)
+        @test length(hist.t) == 200
+        @test all(isfinite.(hist.t))
+        @test all(isfinite.(hcat(hist.x...)))
+        @test all(isfinite.(hcat(hist.v...)))
+    end
 end

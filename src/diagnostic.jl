@@ -146,11 +146,14 @@ end
 using ProgressBars
 
 function anim_traj(history::PDMPHistory, N_max::Int; N_start::Int=1, plot_start::Int=1,
-    filename::Union{String, Nothing}=nothing, plot_type="2D", color="#78C2AD", background="#FFF",
-    coordinate_numbers=[1,2,3], dt::Float64=0.1, verbose::Bool=true,
+    filename::Union{String, Nothing}=nothing, plot_type="2D", color="#78C2AD", background="#FFF", scatter_color="#E95420",
+    scatter_alpha=0.6, markerstrokewidth=0.0, scatter_markersize=3,
+    skip_frames::Int=1,
+    coordinate_numbers=[1,2,3], dt::Float64=0.1, verbose::Bool=true, xlabel=L"x_1", ylabel=L"x_2", zlabel=L"x_3",
     fps::Int=60, frame_upper_limit::Int=10000, linewidth=2, dynamic_range::Bool=false,
+    xlims=nothing, ylims=nothing,
     title::Union{String, LaTeXString}="Trajectory (from $N_start to $N_max events)",
-    nonlinear_flow::Union{Function, Nothing}=nothing)
+    nonlinear_flow::Union{Function, Nothing}=nothing, kwargs...)
 
     N_max = min(N_max, length(history.t), frame_upper_limit)  # to avoid BoundsError
     time_stamps = history.t[N_start:N_max]
@@ -166,7 +169,8 @@ function anim_traj(history::PDMPHistory, N_max::Int; N_start::Int=1, plot_start:
             title=title,
             color=color,
             background=background,
-            linewidth=linewidth
+            linewidth=linewidth,
+            kwargs...
             )
         args = dynamic_range ? (; args..., xlims=nothing, ylims=nothing) : args
         traj = traj[1,:]  # Vector に変換しないと @animate に掛かる時間が 10 倍くらいになる
@@ -182,28 +186,35 @@ function anim_traj(history::PDMPHistory, N_max::Int; N_start::Int=1, plot_start:
         # initialize plot
         p = plot(times[1:plot_start_frame], traj[1:plot_start_frame]; args...)
         scatter!(p, [times[intersect(1:plot_start_frame, event_indeces)]], traj[intersect(1:plot_start_frame, event_indeces)],
-        marker=:circle, markersize=3, markeralpha=0.6, color="#E95420", label=false)
+        marker=:circle, markersize=3, markeralpha=scatter_alpha, color=scatter_color, label=false)
         iter = verbose ? ProgressBar(plot_start_frame:upper_limit, unit="B", unit_scale=true) : plot_start_frame:upper_limit
 
         anim = @animate for i ∈ iter
             Base.push!(p, times[i], traj[i])
             if i ∈ event_indeces
-                scatter!(p, [times[i]], traj[i:i], marker=:circle, markersize=3, markeralpha=0.6, color="#E95420", label=false)
+                scatter!(p, [times[i]], traj[i:i], marker=:circle, markersize=3, markeralpha=scatter_alpha, color=scatter_color, label=false)
             end
-        end
+        end every skip_frames
 
     elseif plot_type == "2D"  # if dim > 1 & 2D plot is 
         traj, event_indeces, _times = traj_for_animation(history, time_stamps, N_start, N_max; coordinate_numbers=coordinate_numbers[1:2], dt=dt, nonlinear_flow=nonlinear_flow)
+        if isnothing(xlims)
+            xlims = (floor(minimum(traj[1,plot_start:end]),digits=1), ceil(maximum(traj[1,plot_start:end]),digits=1))
+        end
+        if isnothing(ylims)
+            ylims = (floor(minimum(traj[2,plot_start:end]),digits=1), ceil(maximum(traj[2,plot_start:end]),digits=1))
+        end
         args = (
-            xlims=(floor(minimum(traj[1,plot_start:end]),digits=1), ceil(maximum(traj[1,plot_start:end]),digits=1)),
-            ylims=(floor(minimum(traj[2,plot_start:end]),digits=1), ceil(maximum(traj[2,plot_start:end]),digits=1)),
-            xlabel=L"x_1",
-            ylabel=L"x_2",
+            xlims=xlims,
+            ylims=ylims,
+            xlabel=xlabel,
+            ylabel=ylabel,
             label=false,
             title=title,
             color=color,
             background=background,
-            linewidth=linewidth
+            linewidth=linewidth,
+            kwargs...
             )
         args = dynamic_range ? (; args..., xlims=nothing, ylims=nothing) : args
         traj_x = traj[1,:]
@@ -215,30 +226,32 @@ function anim_traj(history::PDMPHistory, N_max::Int; N_start::Int=1, plot_start:
             @warn "plot_start_frame: $plot_start_frame > upper_limit: $upper_limit"
             plot_start_frame = upper_limit - 100
         end
-        p = plot(traj_x[1:plot_start_frame], traj_y[1:plot_start_frame]; args...)
-        scatter!(p, [traj_x[intersect(1:plot_start_frame, event_indeces)]], traj_y[intersect(1:plot_start_frame, event_indeces)], marker=:circle, markersize=3, markeralpha=0.6, color="#E95420", label=false)
         iter = verbose ? ProgressBar(plot_start_frame:upper_limit, unit="B", unit_scale=true) : plot_start_frame:upper_limit
 
         anim = @animate for i ∈ iter
-            Base.push!(p, traj_x[i], traj_y[i])
-            if i ∈ event_indeces
-                scatter!(p, traj_x[i:i], traj_y[i:i], marker=:circle, markersize=3, markeralpha=0.6, color="#E95420", label=false)
-            end
-        end
+            p = plot(traj_x[1:i], traj_y[1:i]; args...)
+            scatter!(p, [traj_x[intersect(1:i, event_indeces)]], traj_y[intersect(1:i, event_indeces)], marker=:circle, markersize=scatter_markersize,
+                markeralpha=scatter_alpha, color=scatter_color, markerstrokewidth=markerstrokewidth, label=false
+                )
+            scatter!(p, traj_x[i:i], traj_y[i:i];
+                marker=:circle, color=color, markersize=6, markerstrokewidth=0, label=false
+                )
+        end every skip_frames
     else  # if dim > 1 & 3D plot is requested
         traj, event_indeces, _times = traj_for_animation(history, time_stamps, N_start, N_max; coordinate_numbers=coordinate_numbers[1:3], dt=dt, nonlinear_flow=nonlinear_flow)
         args = (
             xlims=(floor(minimum(traj[1,plot_start:end]),digits=1), ceil(maximum(traj[1,plot_start:end]),digits=1)),
             ylims=(floor(minimum(traj[2,plot_start:end]),digits=1), ceil(maximum(traj[2,plot_start:end]),digits=1)),
             zlims=(floor(minimum(traj[3,plot_start:end]),digits=1), ceil(maximum(traj[3,plot_start:end]),digits=1)),
-            xlabel=L"x_1",
-            ylabel=L"x_2",
-            zlabel=L"x_3",
+            xlabel=xlabel,
+            ylabel=ylabel,
+            zlabel=zlabel,
             label=false,
             title=title,
             color=color,
             background=background,
-            linewidth=linewidth
+            linewidth=linewidth,
+            kwargs...
             )
         args = dynamic_range ? (; args..., xlims=nothing, ylims=nothing, zlims=nothing) : args
         traj_x = traj[1,:]
@@ -253,14 +266,312 @@ function anim_traj(history::PDMPHistory, N_max::Int; N_start::Int=1, plot_start:
         end
         # initialize plot
         p = plot(traj_x[1:plot_start_frame], traj_y[1:plot_start_frame], traj_z[1:plot_start_frame]; args...)
-        scatter!(p, [traj_x[intersect(1:plot_start_frame, event_indeces)]], traj_y[intersect(1:plot_start_frame, event_indeces)], traj_z[intersect(1:plot_start_frame, event_indeces)], marker=:circle, markersize=3, markeralpha=0.6, color="#E95420", label=false)
+        scatter!(p, [traj_x[intersect(1:plot_start_frame, event_indeces)]], traj_y[intersect(1:plot_start_frame, event_indeces)], traj_z[intersect(1:plot_start_frame, event_indeces)], marker=:circle, markersize=3, markeralpha=scatter_alpha, color=scatter_color, label=false)
         iter = verbose ? ProgressBar(plot_start_frame:upper_limit, unit="B", unit_scale=true) : plot_start_frame:upper_limit
 
         anim = @animate for i ∈ iter
             Base.push!(p, traj_x[i], traj_y[i], traj_z[i])
             if i ∈ event_indeces
-                scatter!(p, traj_x[i:i], traj_y[i:i], traj_z[i:i], marker=:circle, markersize=3, markeralpha=0.6, color="#E95420", label=false)
+                scatter!(p, traj_x[i:i], traj_y[i:i], traj_z[i:i], marker=:circle, markersize=3, markeralpha=scatter_alpha, color=scatter_color, label=false)
             end
+        end every skip_frames
+    end
+
+    if !isnothing(filename)
+        filename = isnothing(filename) ? "PDMPFlux_Animation.gif" : filename
+        filename = endswith(filename, ".gif") ? filename : filename * ".gif"
+        gif(anim, filename, fps=fps)
+    end
+
+    return anim
+end
+
+"""
+    A buffer function under development
+    supports faded color animation
+"""
+function anim_traj_(history::PDMPHistory, N_max::Int; N_start::Int=1, plot_start::Int=1,
+    filename::Union{String, Nothing}=nothing, plot_type="2D", color="#78C2AD", background="#FFF", scatter_color="#E95420", scatter_alpha=0.6, scatter_size=3,
+    coordinate_numbers=[1,2,3], dt::Float64=0.1, verbose::Bool=true, xlabel=L"x_1", ylabel=L"x_2", zlabel=L"x_3",
+    fps::Int=60, frame_upper_limit::Int=10000, linewidth=2, dynamic_range::Bool=false,
+    xlims=nothing, ylims=nothing, skip_frames::Int=1,
+    title::Union{String, LaTeXString}="Trajectory (from $N_start to $N_max events)",
+    nonlinear_flow::Union{Function, Nothing}=nothing,
+    fade::Bool=true,
+    tail_length::Int=100,
+    highlight_length::Int=15,
+    history_stride::Int=1,
+    history_color=:black,
+    history_alpha::Float64=1.0,
+    tail_color_start=history_color,
+    tail_color_end=color,
+    highlight_color=color,
+    kwargs...)
+
+    N_max = min(N_max, length(history.t), frame_upper_limit)  # to avoid BoundsError
+    time_stamps = history.t[N_start:N_max]
+
+    if size(history.X, 1) == 1 || plot_type == "1D"  # if dim = 1, horizontal axis is time
+        traj, event_indeces, times = traj_for_animation(history, time_stamps, N_start, N_max; coordinate_numbers=coordinate_numbers[1], dt=dt, nonlinear_flow=nonlinear_flow)
+        args = (
+            xlims=(0, times[min(end, frame_upper_limit)]),
+            ylims=(floor(minimum(traj[1,plot_start:end]),digits=1), ceil(maximum(traj[1,plot_start:end]),digits=1)),
+            xlabel=L"t",
+            ylabel=L"x",
+            label=false,
+            title=title,
+            background=background,
+            kwargs...
+            )
+        args = dynamic_range ? (; args..., xlims=nothing, ylims=nothing) : args
+        traj = traj[1,:]  # Vector に変換しないと @animate に掛かる時間が 10 倍くらいになる
+        # times = collect(Float64, 1:length(traj))  # なぜか Float64 にしないと @animate 内の push! エラー oundsError: attempt to access 2-element Vector{Plots.Series} at index [3] が出る
+
+        # maximum number of events to be plotted
+        upper_limit = min(length(traj), frame_upper_limit)
+        plot_start_frame = event_indeces[plot_start]
+        if plot_start_frame > upper_limit
+            @warn "plot_start_frame: $plot_start_frame > upper_limit: $upper_limit"
+            plot_start_frame = upper_limit - 100
+        end
+        iter = verbose ? ProgressBar(plot_start_frame:upper_limit, unit="B", unit_scale=true) : plot_start_frame:upper_limit
+
+        tail_cgrad = cgrad([tail_color_start, tail_color_end])
+
+        if fade
+            anim = @animate for i ∈ iter
+                i_tail_start = max(plot_start_frame, i - tail_length + 1)
+                i_highlight_start = max(i_tail_start, i - highlight_length + 1)
+
+                hist_end = max(i_tail_start - 1, plot_start_frame)
+                hist_idx = 1:history_stride:hist_end
+
+                p = plot(times[hist_idx], traj[hist_idx];
+                    args...,
+                    color=history_color,
+                    alpha=history_alpha,
+                    linewidth=linewidth,
+                    colorbar = false,
+                )
+
+                # tail (gradient: black -> red)
+                plot!(p, times[i_tail_start:i], traj[i_tail_start:i];
+                    seriescolor=tail_cgrad,
+                    line_z=1:(i - i_tail_start + 1),
+                    linewidth=linewidth,
+                    label=false
+                )
+
+                # highlight newest segment in red
+                plot!(p, times[i_highlight_start:i], traj[i_highlight_start:i];
+                    color=highlight_color,
+                    linewidth=linewidth + 0.5,
+                    label=false
+                )
+
+                # event markers up to current frame
+                last_ev = searchsortedlast(event_indeces, i)
+                if last_ev > 0
+                    ev = @view event_indeces[1:last_ev]
+                    scatter!(p, times[ev], traj[ev];
+                        marker=:circle,
+                        markersize=scatter_size,
+                        markeralpha=scatter_alpha,
+                        color=scatter_color,
+                        label=false
+                    )
+                end
+
+                p
+            end every skip_frames
+        else
+            # legacy: single-color incremental drawing
+            p = plot(times[1:plot_start_frame], traj[1:plot_start_frame]; args..., color=color, linewidth=linewidth)
+            scatter!(p, times[intersect(1:plot_start_frame, event_indeces)], traj[intersect(1:plot_start_frame, event_indeces)];
+                marker=:circle, markersize=scatter_size, markeralpha=scatter_alpha, color=scatter_color, label=false
+            )
+            anim = @animate for i ∈ iter
+                Base.push!(p, times[i], traj[i])
+                if i ∈ event_indeces
+                    scatter!(p, [times[i]], traj[i:i]; marker=:circle, markersize=3, markeralpha=scatter_alpha, color=scatter_color, label=false)
+                end
+                p
+            end every skip_frames
+        end
+
+    elseif plot_type == "2D"  # if dim > 1 & 2D plot is 
+        traj, event_indeces, _times = traj_for_animation(history, time_stamps, N_start, N_max; coordinate_numbers=coordinate_numbers[1:2], dt=dt, nonlinear_flow=nonlinear_flow)
+        if isnothing(xlims)
+            xlims = (floor(minimum(traj[1,plot_start:end]),digits=1), ceil(maximum(traj[1,plot_start:end]),digits=1))
+        end
+        if isnothing(ylims)
+            ylims = (floor(minimum(traj[2,plot_start:end]),digits=1), ceil(maximum(traj[2,plot_start:end]),digits=1))
+        end
+        args = (
+            xlims=xlims,
+            ylims=ylims,
+            xlabel=xlabel,
+            ylabel=ylabel,
+            label=false,
+            title=title,
+            background=background,
+            kwargs...
+            )
+        args = dynamic_range ? (; args..., xlims=nothing, ylims=nothing) : args
+        traj_x = traj[1,:]
+        traj_y = traj[2,:]
+
+        upper_limit = min(length(traj_x), frame_upper_limit)
+        plot_start_frame = event_indeces[plot_start]
+        if plot_start_frame > upper_limit
+            @warn "plot_start_frame: $plot_start_frame > upper_limit: $upper_limit"
+            plot_start_frame = upper_limit - 100
+        end
+        iter = verbose ? ProgressBar(plot_start_frame:upper_limit, unit="B", unit_scale=true) : plot_start_frame:upper_limit
+
+        tail_cgrad = cgrad([tail_color_start, tail_color_end])
+
+        if fade
+            anim = @animate for i ∈ iter
+                i_tail_start = max(plot_start_frame, i - tail_length + 1)
+                i_highlight_start = max(i_tail_start, i - highlight_length + 1)
+
+                hist_end = max(i_tail_start - 1, plot_start_frame)
+                hist_idx = 1:history_stride:hist_end+1
+
+                p = plot(traj_x[hist_idx], traj_y[hist_idx];
+                    args...,
+                    color=history_color,
+                    alpha=history_alpha,
+                    linewidth=linewidth,
+                    colorbar = false,
+                )
+
+                plot!(p, traj_x[i_tail_start:i], traj_y[i_tail_start:i];
+                    seriescolor=tail_cgrad,
+                    line_z=1:(i - i_tail_start + 1),
+                    linewidth=linewidth,
+                    label=false
+                )
+
+                plot!(p, traj_x[i_highlight_start:i], traj_y[i_highlight_start:i];
+                    color=highlight_color,
+                    linewidth=linewidth + 0.5,
+                    label=false
+                )
+
+                last_ev = searchsortedlast(event_indeces, i)
+                if last_ev > 0
+                    ev = @view event_indeces[1:last_ev]
+                    scatter!(p, traj_x[ev], traj_y[ev];
+                        marker=:circle,
+                        markersize=scatter_size,
+                        markeralpha=scatter_alpha,
+                        color=scatter_color,
+                        label=false
+                    )
+                end
+
+                p
+            end every skip_frames
+        else
+            p = plot(traj_x[1:plot_start_frame], traj_y[1:plot_start_frame]; args..., color=color, linewidth=linewidth)
+            scatter!(p, traj_x[intersect(1:plot_start_frame, event_indeces)], traj_y[intersect(1:plot_start_frame, event_indeces)];
+                marker=:circle, markersize=3, markeralpha=scatter_alpha, color=scatter_color, label=false
+            )
+            anim = @animate for i ∈ iter
+                Base.push!(p, traj_x[i], traj_y[i])
+                if i ∈ event_indeces
+                    scatter!(p, traj_x[i:i], traj_y[i:i]; marker=:circle, markersize=scatter_size, markeralpha=scatter_alpha, color=scatter_color, label=false)
+                end
+                p
+            end every skip_frames
+        end
+    else  # if dim > 1 & 3D plot is requested
+        traj, event_indeces, _times = traj_for_animation(history, time_stamps, N_start, N_max; coordinate_numbers=coordinate_numbers[1:3], dt=dt, nonlinear_flow=nonlinear_flow)
+        args = (
+            xlims=(floor(minimum(traj[1,plot_start:end]),digits=1), ceil(maximum(traj[1,plot_start:end]),digits=1)),
+            ylims=(floor(minimum(traj[2,plot_start:end]),digits=1), ceil(maximum(traj[2,plot_start:end]),digits=1)),
+            zlims=(floor(minimum(traj[3,plot_start:end]),digits=1), ceil(maximum(traj[3,plot_start:end]),digits=1)),
+            xlabel=xlabel,
+            ylabel=ylabel,
+            zlabel=zlabel,
+            label=false,
+            title=title,
+            background=background,
+            kwargs...
+            )
+        args = dynamic_range ? (; args..., xlims=nothing, ylims=nothing, zlims=nothing) : args
+        traj_x = traj[1,:]
+        traj_y = traj[2,:]
+        traj_z = traj[3,:]
+
+        upper_limit = min(length(traj_x), frame_upper_limit)
+        plot_start_frame = event_indeces[plot_start]
+        if plot_start_frame > upper_limit
+            @warn "plot_start_frame: $plot_start_frame > upper_limit: $upper_limit"
+            plot_start_frame = upper_limit - 100
+        end
+        iter = verbose ? ProgressBar(plot_start_frame:upper_limit, unit="B", unit_scale=true) : plot_start_frame:upper_limit
+
+        tail_cgrad = cgrad([tail_color_start, tail_color_end])
+
+        if fade
+            anim = @animate for i ∈ iter
+                i_tail_start = max(plot_start_frame, i - tail_length + 1)
+                i_highlight_start = max(i_tail_start, i - highlight_length + 1)
+
+                hist_end = max(i_tail_start - 1, plot_start_frame)
+                hist_idx = 1:history_stride:hist_end
+
+                p = plot(traj_x[hist_idx], traj_y[hist_idx], traj_z[hist_idx];
+                    args...,
+                    color=history_color,
+                    alpha=history_alpha,
+                    linewidth=linewidth,
+                    colorbar = false,
+                )
+
+                # Note: some backends may ignore line_z in 3D; highlight overlay keeps "newest red" visible.
+                plot!(p, traj_x[i_tail_start:i], traj_y[i_tail_start:i], traj_z[i_tail_start:i];
+                    seriescolor=tail_cgrad,
+                    line_z=1:(i - i_tail_start + 1),
+                    linewidth=linewidth,
+                    label=false
+                )
+
+                plot!(p, traj_x[i_highlight_start:i], traj_y[i_highlight_start:i], traj_z[i_highlight_start:i];
+                    color=highlight_color,
+                    linewidth=linewidth + 0.5,
+                    label=false
+                )
+
+                last_ev = searchsortedlast(event_indeces, i)
+                if last_ev > 0
+                    ev = @view event_indeces[1:last_ev]
+                    scatter!(p, traj_x[ev], traj_y[ev], traj_z[ev];
+                        marker=:circle,
+                        markersize=scatter_size,
+                        markeralpha=scatter_alpha,
+                        color=scatter_color,
+                        label=false
+                    )
+                end
+
+                p
+            end every skip_frames
+        else
+            p = plot(traj_x[1:plot_start_frame], traj_y[1:plot_start_frame], traj_z[1:plot_start_frame]; args..., color=color, linewidth=linewidth)
+            scatter!(p, traj_x[intersect(1:plot_start_frame, event_indeces)], traj_y[intersect(1:plot_start_frame, event_indeces)], traj_z[intersect(1:plot_start_frame, event_indeces)];
+                marker=:circle, markersize=scatter_size, markeralpha=scatter_alpha, color=scatter_color, label=false
+            )
+            anim = @animate for i ∈ iter
+                Base.push!(p, traj_x[i], traj_y[i], traj_z[i])
+                if i ∈ event_indeces
+                    scatter!(p, traj_x[i:i], traj_y[i:i], traj_z[i:i]; marker=:circle, markersize=3, markeralpha=scatter_alpha, color=scatter_color, label=false)
+                end
+                p
+            end every skip_frames
         end
     end
 

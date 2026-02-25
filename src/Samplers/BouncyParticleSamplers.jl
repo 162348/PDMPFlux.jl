@@ -20,7 +20,8 @@ mutable struct BPS{G,KF,KR,KRV,KSR,KSRV,KVJ} <: AbstractPDMP
 # Constructor for BouncyParticle
   function BPS(dim::Int, ∇U; grid_size::Int=10, tmax::Union{Float64, Int}=1.0,  
             refresh_rate::Float64=0.1, vectorized_bound::Bool=false, signed_bound::Bool=true,
-            adaptive::Bool=true, AD_backend::String="ForwardDiff")
+            adaptive::Bool=true, AD_backend::String="ForwardDiff",
+            Gaussian_velocity::Bool=false)
     
     tmax = Float64(tmax)
 
@@ -53,16 +54,22 @@ mutable struct BPS{G,KF,KR,KRV,KSR,KSRV,KVJ} <: AbstractPDMP
         u = rand(rng)
 
         function reflect(v, ∇Ux)
-            e = ∇Ux ./ norm(∇Ux)
-            return v .- 2 * dot(v, e) * e
+            g = ∇Ux
+            gg = dot(g, g) # = ||g||^2
+            gg == 0 && return v
+            scale = 2 * dot(v, g) / gg
+            return v .- scale .* g
         end
 
         if u < bounce_prob
             return reflect(v, ∇Ux)
         else
-            v = randn(dim)
-            return v ./ norm(v)
-            # return randn(dim)
+            randn!(rng, v)
+            if Gaussian_velocity
+                return v
+            else
+                return normalize!(v)
+            end
         end
     end
 

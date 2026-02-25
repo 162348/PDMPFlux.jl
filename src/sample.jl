@@ -29,12 +29,13 @@ function sample(
     N_samples::Int,
     xinit::Vector{Float64},
     vinit::Vector{Float64};
-    seed::Int=nothing,
-    verbose::Bool = true
+    seed::Union{Int, Nothing}=nothing,
+    verbose::Bool = true,
+    discard_vt::Bool = true
 )::Matrix{Float64}
 
     history = sample_skeleton(sampler, N_sk, xinit, vinit, seed=seed, verbose=verbose)
-    return sample_from_skeleton(sampler, N_samples, history)
+    return sample_from_skeleton(sampler, N_samples, history, discard_vt=discard_vt)
 
 end
 
@@ -45,7 +46,7 @@ function sample(
     N_samples::Int,
     xinit::Union{Float64, Int},
     vinit::Union{Float64, Int};
-    seed::Int=nothing,
+    seed::Union{Int, Nothing}=nothing,
     verbose::Bool = true
 )::Matrix{Float64}
 

@@ -23,18 +23,49 @@ end
 - **常に長さ `dim` のベクトル勾配**を返す（`dim==1` で `U(::Real)` の場合も `[dU/dx]` を返す）
 """
 function create_gradient_function(U::Function, dim::Int, AD_backend::String)
-  # Detect 1D scalar-input U(::Real) vs vector-input U(::AbstractVector)
-  scalar_1d = false
+  # NOTE:
+  # - This helper is used by `*AD(...)` constructors where the user *usually* provides a potential `U(x)::Real`.
+  # - In practice, users sometimes (accidentally) pass an already-differentiated gradient function `∇U(x)::AbstractVector`.
+  #   ForwardDiff.gradient/Zygote.gradient would then throw:
+  #     "gradient(f, x) expects that f(x) is a real number ..."
+  #   We detect this case once here and simply return the provided gradient.
+
+  # Determine calling convention for dim==1: U(::Real) vs U(::AbstractVector)
+  input_mode = :vector
+  probe_x_vec = ones(Float64, dim)
+  probe_y = nothing
   if dim == 1
     try
-      U([1.0])
+      probe_y = U([1.0])
+      input_mode = :vector
     catch
-      scalar_1d = true
+      probe_y = U(1.0)
+      input_mode = :scalar
     end
+  else
+    probe_y = U(probe_x_vec)
+    input_mode = :vector
   end
 
+  # Case 1: user already provided a gradient function ∇U(x)
+  if probe_y isa AbstractVector
+    if length(probe_y) != dim
+      throw(ArgumentError("Expected U(x) to return a scalar potential (Real) or a gradient vector of length $dim. Got AbstractVector of length $(length(probe_y))."))
+    end
+    return function(x::AbstractVector)
+      g = (dim == 1 && input_mode == :scalar) ? U(x[1]) : U(x)
+      if dim == 1 && (g isa Real)
+        return [g]
+      end
+      return g
+    end
+  elseif !(probe_y isa Real)
+    throw(ArgumentError("Expected U(x) to return a scalar potential (Real) or a gradient vector (AbstractVector). Got $(typeof(probe_y))."))
+  end
+
+  # Case 2: user provided a scalar potential U(x)::Real → build ∇U(x)
   if AD_backend == "Zygote"
-    if dim == 1 && scalar_1d
+    if dim == 1 && input_mode == :scalar
       return function(x::AbstractVector)
         return [Zygote.gradient(U, x[1])[1]]
       end
@@ -44,7 +75,7 @@ function create_gradient_function(U::Function, dim::Int, AD_backend::String)
       end
     end
   elseif AD_backend == "ForwardDiff"
-    if dim == 1 && scalar_1d
+    if dim == 1 && input_mode == :scalar
       return function(x::AbstractVector)
         return [ForwardDiff.derivative(U, x[1])]
       end
@@ -54,7 +85,7 @@ function create_gradient_function(U::Function, dim::Int, AD_backend::String)
       end
     end
   elseif AD_backend == "ReverseDiff"
-    if dim == 1 && scalar_1d
+    if dim == 1 && input_mode == :scalar
       return function(x::AbstractVector)
         return [ReverseDiff.gradient(z -> U(z[1]), [x[1]])[1]]
       end
@@ -67,7 +98,7 @@ function create_gradient_function(U::Function, dim::Int, AD_backend::String)
     if !HAS_ENZYME
       throw(ArgumentError("Enzyme package is not available. Please install it with: ] add Enzyme"))
     end
-    if dim == 1 && scalar_1d
+    if dim == 1 && input_mode == :scalar
       return function(x::AbstractVector)
         grad_result = Enzyme.gradient(Enzyme.Reverse, z -> U(z[1]), Enzyme.Active([x[1]]))
         return [grad_result[1][1]]
