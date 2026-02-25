@@ -11,6 +11,9 @@ end
   Set the AD backend for the <sampler name>AD() constructors defined in src/Samplers/*.jl
 """
 function set_AD_backend(AD_backend::String, U::Function, dim::Int)
+  if dim <= 0
+    throw(ArgumentError("dimension dim must be positive. Current value: $dim"))
+  end
   return create_gradient_function(U, dim, AD_backend)
 end
 

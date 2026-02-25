@@ -78,7 +78,7 @@ diagnostic(output)
 
 jointplot(samples)
 ```
-
+<!-- 
 ## Motivation
 
 Markov Chain Monte Carlo (MCMC) methods are standard in sampling from distributions with unknown normalizing constants.
@@ -93,58 +93,90 @@ particularly in high-dimensional and big data contexts, as discussed in [Bouchar
 Despite their potential, practical applications of PDMPs remained limited by the lack of efficient and flexible implementations.
 
 Inspired by [Andral and Kamatani (2024)](https://arxiv.org/abs/2408.03682) and their `jax` based implementation in [`pdmp_jax`](https://github.com/charlyandral/pdmp_jax),`PDMPFlux.jl` is my attempt to fill this gap, with the aid of the existing automatic differentiation engines.
+-->
 
 ## Implemented PDMP Samplers
 
-### Zig-Zag Sampler
+Click a thumbnail to open the full GIF.
 
-proposed by [Bierkens, Fearnhead & Roberts (2019)](https://projecteuclid.org/journals/annals-of-statistics/volume-47/issue-3/The-Zig-Zag-process-and-super-efficient-sampling-for-Bayesian/10.1214/18-AOS1715.full).
+<table>
+  <tr>
+    <td align="center" width="33%">
+      <a href="https://github.com/162348/162348.github.io/blob/main/posts/2024/Julia/assets/SlantedGauss/ZigZag_SlantedGauss2D.gif?raw=true">
+        <img alt="Zig-Zag demo" src="https://github.com/162348/162348.github.io/blob/main/posts/2024/Julia/assets/SlantedGauss/ZigZag_SlantedGauss2D.gif?raw=true" width="260" />
+      </a><br/>
+      <b>Zig-Zag Sampler</b><br/>
+      <a href="https://projecteuclid.org/journals/annals-of-statistics/volume-47/issue-3/The-Zig-Zag-process-and-super-efficient-sampling-for-Bayesian/10.1214/18-AOS1715.full">Bierkens, Fearnhead &amp; Roberts (2019)</a>
+    </td>
+    <td align="center" width="33%">
+      <a href="https://github.com/162348/162348.github.io/blob/main/posts/2024/Julia/assets/SlantedGauss/BPS_SlantedGauss2D.gif?raw=true">
+        <img alt="BPS demo" src="https://github.com/162348/162348.github.io/blob/main/posts/2024/Julia/assets/SlantedGauss/BPS_SlantedGauss2D.gif?raw=true" width="260" />
+      </a><br/>
+      <b>Bouncy Particle Sampler (BPS)</b><br/>
+      <a href="https://www.tandfonline.com/doi/full/10.1080/01621459.2017.1294075">Bouchard-Côte et. al. (2018)</a>
+    </td>
+    <td align="center" width="33%">
+      <a href="https://github.com/162348/162348.github.io/blob/main/posts/2024/Julia/assets/SlantedGauss/ForwardECMC_SlantedGauss2D.gif?raw=true">
+        <img alt="Forward ECMC demo" src="https://github.com/162348/162348.github.io/blob/main/posts/2024/Julia/assets/SlantedGauss/ForwardECMC_SlantedGauss2D.gif?raw=true" width="260" />
+      </a><br/>
+      <b>Forward ECMC</b><br/>
+      <a href="https://www.tandfonline.com/doi/full/10.1080/10618600.2020.1750417">Michel, Durmus &amp; Sénécal (2020)</a>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" width="33%">
+      <a href="https://github.com/162348/162348.github.io/blob/main/posts/2024/Julia/assets/SlantedGauss/Boomerang_SlantedGauss2D.gif?raw=true">
+        <img alt="Boomerang demo" src="https://github.com/162348/162348.github.io/blob/main/posts/2024/Julia/assets/SlantedGauss/Boomerang_SlantedGauss2D.gif?raw=true" width="260" />
+      </a><br/>
+      <b>Boomerang Sampler</b><br/>
+      <a href="https://proceedings.mlr.press/v119/bierkens20a.html">Bierkens et. al. (2020)</a>
+    </td>
+    <td align="center" width="33%">
+      <a href="https://github.com/162348/162348.github.io/blob/main/posts/2024/Julia/assets/SlantedGauss/RHMC_SlantedGauss2D.gif?raw=true">
+        <img alt="RHMC demo" src="https://github.com/162348/162348.github.io/blob/main/posts/2026/Slides/ISM/RHMC_white.gif?raw=true" width="260" />
+      </a><br/>
+      <b>Randomized Hamiltonian Monte Carlo (RHMC)</b><br/>
+      <a href="https://projecteuclid.org/journals/annals-of-applied-probability/volume-27/issue-4/Randomized-Hamiltonian-Monte-Carlo/10.1214/16-AAP1255.full">Bou-Rabee & Sanz-Serna (2017)</a>
+    </td>
+    <td align="center" width="33%">
+      <a href="https://github.com/162348/162348.github.io/blob/main/posts/2024/Julia/assets/SlantedGauss/SUZZ_SlantedGauss2D.gif?raw=true">
+        <img alt="SUZZ demo" src="https://github.com/162348/162348.github.io/blob/main/posts/2024/Julia/assets/SlantedGauss/SUZZ_SlantedGauss2D.gif?raw=true" width="260" />
+      </a><br/>
+      <b>Speed Up Zig-Zag (SUZZ)</b><br/>
+      <a href="https://projecteuclid.org/journals/annals-of-applied-probability/volume-33/issue-6A/Speed-up-Zig-Zag/10.1214/23-AAP1930.full">Vasdekis &amp; Roberts (2023)</a>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" width="33%">
+      <a href="https://github.com/162348/162348.github.io/blob/main/posts/2024/Julia/assets/SlantedGauss/StickyZigZag_SlantedGauss2D.gif?raw=true">
+        <img alt="Sticky Zig-Zag demo" src="https://github.com/162348/162348.github.io/blob/main/posts/2024/Julia/assets/SlantedGauss/StickyZigZag_SlantedGauss2D.gif?raw=true" width="260" />
+      </a><br/>
+      <b>Sticky Zig-Zag Sampler</b><br/>
+      <a href="https://link.springer.com/article/10.1007/s11222-022-10180-5">Bierkens et. al. (2023)</a>
+    </td>
+    <td width="33%"></td>
+    <td width="33%"></td>
+  </tr>
+</table>
 
-![](https://github.com/162348/162348.github.io/blob/main/posts/2024/Julia/assets/SlantedGauss/ZigZag_SlantedGauss2D.gif?raw=true)
 
-### Bouncy Particle Sampler (BPS)
+<!-- 
 
-proposed by [Bouchard-Côte et. al. (2018)](https://www.tandfonline.com/doi/full/10.1080/01621459.2017.1294075).
-
-![](https://github.com/162348/162348.github.io/blob/main/posts/2024/Julia/assets/SlantedGauss/BPS_SlantedGauss2D.gif?raw=true)
-
-### Forward Event Chain Monte Carlo (Forward ECMC)
-
-proposed by [Michel, Durmus & Sénécal (2020)](https://www.tandfonline.com/doi/full/10.1080/10618600.2020.1750417).
-
-![](https://github.com/162348/162348.github.io/blob/main/posts/2024/Julia/assets/SlantedGauss/ForwardECMC_SlantedGauss2D.gif?raw=true)
-
-### Boomerang Sampler
-
-proposed by [Bierkens et. al. (2020)](https://proceedings.mlr.press/v119/bierkens20a.html).
-
-![](https://github.com/162348/162348.github.io/blob/main/posts/2024/Julia/assets/SlantedGauss/Boomerang_SlantedGauss2D.gif?raw=true)
-
-### Speed Up Zig-Zag (SUZZ)
-
-proposed by [Vasdekis and Roberts (2023)](https://projecteuclid.org/journals/annals-of-applied-probability/volume-33/issue-6A/Speed-up-Zig-Zag/10.1214/23-AAP1930.full).
-
-![](https://github.com/162348/162348.github.io/blob/main/posts/2024/Julia/assets/SlantedGauss/SUZZ_SlantedGauss2D.gif?raw=true)
-
-### Sticky Zig-Zag Sampler
-
-proposed in [Bierkens et. al. (2023)](https://link.springer.com/article/10.1007/s11222-022-10180-5).
-
-![](https://github.com/162348/162348.github.io/blob/main/posts/2024/Julia/assets/SlantedGauss/StickyZigZag_SlantedGauss2D.gif?raw=true)
 
 ## Remarks
 
 - The automatic Poisson thinning implementation in `PDMPFlux.jl` is based on the paper [Andral and Kamatani (2024) Automated Techniques for Efficient Sampling of Piecewise-Deterministic Markov Processes](https://arxiv.org/abs/2408.03682) and its accompanying Python package [`pdmp_jax`](https://github.com/charlyandral/pdmp_jax).
 - [`pdmp_jax`](https://github.com/charlyandral/pdmp_jax) has a [`jax`](https://github.com/jax-ml/jax) based implementation, and typically about four times faster than current `PDMPFlux.jl`.
 - Both [`ForwardDiff.jl`](https://github.com/JuliaDiff/ForwardDiff.jl) and [`Zygote.jl`](https://github.com/FluxML/Zygote.jl) are used for automatic differentiation, each with their own trade-offs.
+-->
 
 ## References
 
 * [`pdmp_jax`](https://github.com/charlyandral/pdmp_jax) by [Charly Andral](https://github.com/charlyandral), on which this repository is strongly based on and indebted to.
   * [Andral and Kamatani (2024) Automated Techniques for Efficient Sampling of Piecewise-Deterministic Markov Processes](https://arxiv.org/abs/2408.03682)
-* [`ForwardDiff.jl`](https://github.com/JuliaDiff/ForwardDiff.jl) and [`Zygote.jl`](https://github.com/FluxML/Zygote.jl) are used for automatic differentiation.
+<!-- * [`ForwardDiff.jl`](https://github.com/JuliaDiff/ForwardDiff.jl) and [`Zygote.jl`](https://github.com/FluxML/Zygote.jl) are used for automatic differentiation.
   * [Revels, Lubin, and Papamarkou (2016) Forward-Mode Automatic Differentiation in Julia](https://arxiv.org/abs/1607.07892)
-  * [Innes et. al. (2018) Fashionable Modelling with Flux](https://arxiv.org/abs/1811.01457)
+  * [Innes et. al. (2018) Fashionable Modelling with Flux](https://arxiv.org/abs/1811.01457) -->
 * Other PDMP packages:
   * Julia
     * [`ZigZagBoomerang.jl`](https://github.com/mschauer/ZigZagBoomerang.jl) by [Marcel Schauer](https://github.com/mschauer)
@@ -153,3 +185,5 @@ proposed in [Bierkens et. al. (2023)](https://link.springer.com/article/10.1007/
   * R
     * [`rjpdmp`](https://github.com/matt-sutton/rjpdmp) by [Matthew Sutton](https://github.com/matt-sutton)
     * [`RZigZag`](https://github.com/jbierkens/RZigZag) by [Joris Bierkens](https://github.com/jbierkens)
+
+Please kindly notify me if I missed any references. Thank you!
