@@ -96,4 +96,50 @@ using Test
         @test length(outputs[3].t) >= length(outputs[2].t)
         @test length(outputs[2].t) >= length(outputs[1].t)
     end
+
+    @testset "Realized Volatility Diagnostics" begin
+        U_linear_path(x::AbstractVector) = x[1]^2 / 2
+
+        history = PDMPHistory(1, 3)
+        history.X[1, 1] = 0.0
+        history.X[1, 2] = 0.5
+        history.X[1, 3] = 1.0
+        history.V[1, 1] = 1.0
+        history.V[1, 2] = 1.0
+        history.V[1, 3] = 1.0
+        history.t .= [0.0, 0.5, 1.0]
+        history.is_active .= true
+        history.horizon .= 0.0
+        history.ar .= 0.0
+        history.errored_bound .= 0
+        history.error_value_ar .= 0.0
+        history.rejected .= 0
+        history.hitting_horizon .= 0
+
+        rv = RV_diagnostic(history, U_linear_path; B=4)
+        expected = sum((U_linear_path([k / 4]) - U_linear_path([(k - 1) / 4]))^2 for k in 1:4)
+
+        @test rv ≈ expected
+        @test RV_diagnostic(history, U_linear_path; B=0) > 0.0
+        @test_throws ArgumentError RV_diagnostic(history, U_linear_path; B=-1)
+
+        U_quad(x::AbstractVector) = dot(x, x) / 2
+        dim = 3
+        sampler = ForwardECMCAD(dim, U_quad, grid_size=8, tmax=1.0, adaptive=false)
+        xinit = zeros(dim)
+        vinit = ones(dim) ./ sqrt(dim)
+        history_online, rv_online = sample_skeleton_with_diagnostic(
+            sampler,
+            3.0,
+            xinit,
+            vinit,
+            U_quad;
+            B=20,
+            seed=42,
+            verbose=false,
+        )
+        rv_offline = RV_diagnostic(history_online, U_quad; B=20)
+
+        @test rv_online ≈ rv_offline rtol=1e-10 atol=1e-12
+    end
 end

@@ -23,11 +23,11 @@ include("SamplingLoop.jl")
 include("StickySamplingLoop.jl")
 include("sample.jl")
 
-export sample, sample_skeleton, sample_from_skeleton
+export sample, sample_skeleton, sample_from_skeleton, sample_skeleton_with_diagnostic
 
 include("diagnostic.jl")
 include("plot.jl")
 
-export diagnostic, plot_traj, anim_traj, anim_traj_, jointplot, marginalplot, plot_traj!, plot_U_contour
+export diagnostic, RV_diagnostic, plot_traj, anim_traj, anim_traj_, jointplot, marginalplot, plot_traj!, plot_U_contour
 
 end

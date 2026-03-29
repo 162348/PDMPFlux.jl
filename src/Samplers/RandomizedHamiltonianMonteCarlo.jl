@@ -179,9 +179,10 @@ end
 
 Convenience constructor that builds `∇U` via the selected AD backend, like `ZigZagAD` etc.
 """
-function RHMCAD(dim::Int, U::Function; AD_backend::String="Zygote", kwargs...)
-    ∇U = set_AD_backend(AD_backend, U, dim)
-    return RHMC(dim, ∇U; AD_backend=AD_backend, kwargs...)
+function RHMCAD(dim::Int, U::Function; AD_backend::String="ForwardDiff", kwargs...)
+    ad_setup = set_AD_backend(AD_backend, U, dim)
+    ∇U = ad_setup.gradient
+    return RHMC(dim, ∇U; AD_backend=ad_setup.AD_backend, kwargs...)
 end
 
 """

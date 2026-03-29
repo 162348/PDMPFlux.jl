@@ -58,6 +58,186 @@ function sample(
 end
 
 """
+    sample_skeleton_with_diagnostic(): generate a PDMP skeleton (event times/states) from a PDMP sampler with diagnostic information.
+
+    Parameters:
+    - T (Float64): The time horizon to sample up to.
+    - xinit (Array{Float64, 1}): The initial position of the particles.
+    - vinit (Array{Float64, 1}): The initial velocity of the particles.
+    - B (Int64): The number of batches to split the time horizon into.
+    - U (Function): The potential function to use for the diagnostic.
+    - seed (Int): The seed value for random number generation.
+    - verbose (Bool): Whether to display progress bar during sampling. Default is true.
+
+    Returns:
+    - output: The output state of the sampling process.
+"""
+function sample_skeleton_with_diagnostic(
+    sampler::AbstractPDMP,
+    T::Float64,
+    xinit::Vector{Float64},
+    vinit::Vector{Float64},
+    U::Function;
+    B::Int64=10^3,
+    seed::Union{Int, Nothing}=nothing,
+    verbose::Bool=true,
+    init_capacity::Int=1024,
+)::Tuple{PDMPHistory, Float64}
+
+    if !(isfinite(T)) || T < 0
+        throw(ArgumentError("T must be finite and non-negative. Current value: $T"))
+    end
+
+    d = length(xinit)
+    if d == 0
+        throw(ArgumentError("xinit must be non-empty"))
+    end
+
+    state = init_state(sampler, xinit, vinit, seed)
+
+    cap = max(1, init_capacity)
+    history = PDMPHistory(d, cap)
+    k = 1
+    record!(history, k, state, d)
+
+    show_progress = verbose && isinteractive()
+    last_pct = -1
+    if show_progress && T > 0
+        # print 0% at the beginning
+        print(stderr, "\r[sample_skeleton] 0%  (t=0/$(T), events=$(k))")
+        flush(stderr)
+        last_pct = 0
+    end
+
+    # If T==0, the initial point alone is sufficient.
+    if T == 0.0
+        sampler.state = state
+        return _trim_history(history, d, k)
+    end
+
+    Δt = T / B
+    T_list = range(0.0, T; length=B+1)
+    RV = 0.0  # Realized Volatility
+    U_increment = 0.0
+    batch_index = 2
+
+    # Save the previous state (used to create the final t=T point via flow if we overshoot).
+    x_prev = copy(state.x)
+    v_prev = copy(state.v)
+    active_prev = copy(state.is_active)
+    v_used = copy(v_prev .* active_prev)
+    t_prev = 0.0
+
+    while t_prev <= T
+        get_event_state!(state, sampler)
+            
+        if state.t > T  # Handling overshoot: close remaining batches at their boundaries, then append the t=T point.
+            while batch_index <= B + 1
+                τ_batch = T_list[batch_index] - t_prev
+                if sampler isa StickyPDMP
+                    @inbounds for i in 1:d
+                        v_used[i] = active_prev[i] ? v_prev[i] : 0.0
+                    end
+                    x_batch, v_batch = sampler.flow(x_prev, v_used, τ_batch)
+                else
+                    x_batch, v_batch = sampler.flow(x_prev, v_prev, τ_batch)
+                end
+                U_increment += U(x_batch) - U(x_prev)
+                RV += U_increment^2
+                U_increment = 0.0
+                x_prev, v_prev = x_batch, v_batch
+                t_prev = T_list[batch_index]
+                batch_index += 1
+            end
+
+            state.x = x_prev
+            state.v = v_prev
+            state.t = T
+            @inbounds for i in 1:d
+                state.is_active[i] = active_prev[i]
+            end
+            # `record!` expects these statistics at "non-event" points, so fill with zeros.
+            state.ar = 0.0
+            state.errored_bound = 0
+            fill!(state.error_value_ar, 0.0)
+            state.rejected = 0
+            state.hitting_horizon = 0
+
+            # Keep v_active consistent too.
+            @inbounds for i in 1:d
+                state.v_active[i] = state.is_active[i] ? state.v[i] : 0.0
+            end
+
+            k += 1
+            if k > size(history.X, 2)
+                newcap = max(k, 2 * size(history.X, 2))
+                history = _grow_history(history, d, newcap, k - 1)
+            end
+            record!(history, k, state, d)
+            break
+        end
+
+        # The state.t <= T case
+
+        while batch_index <= B + 1 && state.t >= T_list[batch_index]
+            τ_batch = T_list[batch_index] - t_prev
+            if sampler isa StickyPDMP
+                @inbounds for i in 1:d
+                    v_used[i] = active_prev[i] ? v_prev[i] : 0.0
+                end
+                x_batch, v_batch = sampler.flow(x_prev, v_used, τ_batch)
+            else
+                x_batch, v_batch = sampler.flow(x_prev, v_prev, τ_batch)
+            end
+            U_increment += U(x_batch) - U(x_prev)
+            RV += U_increment^2
+            U_increment = 0.0
+            x_prev, v_prev = x_batch, v_batch
+            t_prev = T_list[batch_index]
+            batch_index += 1
+        end
+
+        U_increment += U(state.x) - U(x_prev)
+
+        ### Closing the event loop
+
+        # 1. updating the history
+        k += 1
+        if k > size(history.X, 2)
+            newcap = max(k, 2 * size(history.X, 2))
+            history = _grow_history(history, d, newcap, k - 1)
+        end
+        record!(history, k, state, d)
+
+        # 2. updating the previous state
+        copyto!(x_prev, state.x)
+        copyto!(v_prev, state.v)
+        @inbounds for i in 1:d
+            active_prev[i] = state.is_active[i]
+        end
+        t_prev = state.t
+
+        if show_progress
+            pct = Int(floor(100 * min(state.t / T, 1.0)))
+            if pct != last_pct
+                print(stderr, "\r[sample_skeleton] $(pct)%  (t=$(round(state.t; digits=4))/$(T), events=$(k))")
+                flush(stderr)
+                last_pct = pct
+            end
+        end
+    end
+
+    sampler.state = state
+    if show_progress
+        print(stderr, "\r[sample_skeleton] 100% (t=$(T)/$(T), events=$(k))\n")
+        flush(stderr)
+    end
+    return _trim_history(history, d, k), RV/T
+end
+
+
+
+"""
     sample_skeleton(): generate a PDMP skeleton (event times/states) from a PDMP sampler.
 
     Parameters:
