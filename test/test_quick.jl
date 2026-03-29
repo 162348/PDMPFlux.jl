@@ -42,18 +42,11 @@ using Random
             ("BPS", BPSAD(dim, U_Gauss_2D, grid_size=0)),
             ("Boomerang", BoomerangAD(dim, U_Gauss_2D, grid_size=0)),
         ]
-        
-        # ForwardECMCは3次元以上が必要
-        dim_3d = 3
-        function U_Gauss_3D(x::AbstractVector)
-            return sum(x.^2) / 2
-        end
-        xinit_3d = [0.0, 0.0, 0.0]
-        vinit_3d = [1.0, 1.0, 1.0]
-        
+
         @testset "ForwardECMC" begin
-            sampler = ForwardECMCAD(dim_3d, U_Gauss_3D, grid_size=10)
-            output = sample_skeleton(sampler, 50, xinit_3d, vinit_3d, seed=seed)
+            sampler = ForwardECMCAD(dim, U_Gauss_2D, grid_size=10)
+            vinit_fecmc = vinit ./ norm(vinit)
+            output = sample_skeleton(sampler, 50, xinit, vinit_fecmc, seed=seed)
             @test length(output.t) > 0
             @test all(isfinite.(output.t))
         end

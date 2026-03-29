@@ -18,6 +18,25 @@ using PDMPFlux
         # 無効な関数
         @test_throws MethodError ZigZagAD(1, nothing, grid_size=0)
     end
+
+    @testset "ForwardECMC dimension constraints" begin
+        function U_Gauss(x::AbstractVector)
+            return sum(x.^2) / 2
+        end
+
+        # d=1 は非対応
+        @test_throws ArgumentError ForwardECMCAD(1, U_Gauss, grid_size=0)
+
+        # d=2 は動作する
+        @test_nowarn begin
+            sampler = ForwardECMCAD(2, U_Gauss, grid_size=0)
+            xinit = zeros(2)
+            vinit = ones(2) ./ sqrt(2)
+            output = sample_skeleton(sampler, 20, xinit, vinit, seed=42, verbose=false)
+            @test length(output.t) > 0
+            @test all(isfinite.(output.t))
+        end
+    end
     
     @testset "Boundary Conditions" begin
         function U_Gauss_1D(x::Float64)

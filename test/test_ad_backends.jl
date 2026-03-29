@@ -144,16 +144,16 @@ using PDMPFlux
     end
     
     @testset "ForwardECMCAD with different backends" begin
-        function U_Gauss_3D(x::AbstractVector)
+        function U_Gauss_2D(x::AbstractVector)
             return sum(x.^2) / 2
         end
         
-        # ForwardEventChain は dim >= 3 が必要
-        dim = 3
+        # ForwardEventChain は dim >= 2 が必要（d=1 は非対応）
+        dim = 2
         grid_size = 10
         
         for backend in ["ForwardDiff", "Zygote", "ReverseDiff"]
-            sampler = ForwardECMCAD(dim, U_Gauss_3D, grid_size=grid_size, AD_backend=backend)
+            sampler = ForwardECMCAD(dim, U_Gauss_2D, grid_size=grid_size, AD_backend=backend)
             
             # 短いスケルトンサンプリングのテスト
             N_sk = 100
@@ -237,5 +237,21 @@ using PDMPFlux
             @test length(output.t) > 0
             @test all(isfinite.(output.t))
         end
+    end
+
+    @testset "ForwardDiff resolution at initialization" begin
+        function U_scalar_typed(x::Float64)
+            return x^2 / 2
+        end
+
+        sampler = ZigZagAD(1, U_scalar_typed, grid_size=0, AD_backend="ForwardDiff")
+
+        # ForwardDiff is not Dual-compatible for this typed scalar signature,
+        # so the backend is resolved once during initialization.
+        @test sampler.AD_backend == "Zygote"
+
+        output = sample_skeleton(sampler, 50, 0.0, 1.0, seed=42)
+        @test length(output.t) > 0
+        @test all(isfinite.(output.t))
     end
 end

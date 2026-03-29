@@ -1,5 +1,7 @@
 # docs/make.jl
-push!(LOAD_PATH, "../src")  # パッケージ本体を見えるように
+# パッケージルート（Project.toml があるディレクトリ）を LOAD_PATH に追加する。
+# `../src` だけを足すと Project.toml が見えず、依存関係チェックで落ちる。
+push!(LOAD_PATH, joinpath(@__DIR__, ".."))
 using Documenter, PDMPFlux
 
 # doctest で必要な using をページ全体に仕込む
@@ -11,7 +13,7 @@ makedocs(
     format   = Documenter.HTML(),
     pages = [
         "Home"            => "index.md",
-        "Tutorials"       => ["tutorials/quickstart.md"],
+        "Tutorials"       => ["tutorials/quickstart.md", "tutorials/samplers.md", "tutorials/ad-backends.md"],
     ],
     checkdocs = :none,  # ドキュメント化されていない関数の警告を抑制
 )

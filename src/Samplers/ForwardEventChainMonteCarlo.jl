@@ -1,6 +1,6 @@
 # Constants for Forward Event Chain Monte Carlo
 const TOLERANCE = 1e-10
-const MIN_DIMENSION = 3
+const MIN_DIMENSION = 2
 
 """
     _global_rate(x0, v0, t, ∇U, flow)
@@ -309,6 +309,9 @@ mutable struct ForwardECMC{G,KF,KR,KRV,KSR,KSRV,KVJ} <: AbstractPDMP
     if dim < MIN_DIMENSION
         throw(ArgumentError("The dimension must be at least $MIN_DIMENSION to use the ForwardEventChain. Got dimension $dim"))
     end
+    if dim == 2
+        mix_p = 0.0  # Orthogonal refresh in dim<3 causes zero division
+    end
 
     flow = (x, v, t) -> (x .+ v .* t, v)
 
@@ -354,7 +357,7 @@ Create ForwardECMC sampler with automatic differentiation.
 - `tmax::Union{Float64, Int}=2.0`: Maximum time horizon
 - `signed_bound::Bool=true`: Use signed bound strategy
 - `adaptive::Bool=true`: Use adaptive time horizon
-- `AD_backend::String="Zygote"`: Automatic differentiation backend
+- `AD_backend::String="ForwardDiff"`: Automatic differentiation backend
 - `ran_p::Bool=true`: Use random orthogonal refresh
 - `mix_p::Float64=0.5`: Mixture probability for refreshment
 
@@ -366,9 +369,10 @@ function ForwardECMCAD(dim::Int, U::Function; grid_size::Int=10, tmax::Union{Flo
     ran_p::Bool=false, mix_p::Float64=0.5, switch::Bool=true, positive::Bool=true, speed_factor::Float64=1.0)
     
     # Create gradient function using the shared AD backend helper (defined in src/ADBackend.jl)
-    ∇U = create_gradient_function(U, dim, AD_backend)
+    ad_setup = set_AD_backend(AD_backend, U, dim)
+    ∇U = ad_setup.gradient
     
     # Create and return sampler
     return ForwardECMC(dim, ∇U, grid_size=grid_size, tmax=tmax,
-                      signed_bound=signed_bound, adaptive=adaptive, ran_p=ran_p, mix_p=mix_p, switch=switch, positive=positive, AD_backend=AD_backend, speed_factor=speed_factor)
+                      signed_bound=signed_bound, adaptive=adaptive, ran_p=ran_p, mix_p=mix_p, switch=switch, positive=positive, AD_backend=ad_setup.AD_backend, speed_factor=speed_factor)
 end
