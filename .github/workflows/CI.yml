@@ -111,6 +111,11 @@ jobs:
   docs:
     name: Documentation
     runs-on: ubuntu-latest
+    concurrency:
+      # All docs deployments write to the same `gh-pages` branch, so serialize them
+      # across refs to avoid non-fast-forward push failures.
+      group: docs-deploy-${{ github.repository }}
+      cancel-in-progress: false
     permissions:
       actions: write # needed to allow julia-actions/cache to proactively delete old caches that it has created
       contents: write
