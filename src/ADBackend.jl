@@ -18,9 +18,10 @@ function set_AD_backend(AD_backend::String, U::Function, dim::Int)
 end
 
 """
-    create_gradient_function(U::Function, dim::Int, AD_backend::String)::Function
+    create_gradient_function(U::Function, dim::Int, AD_backend::String)
 
-Common helper to build a gradient function `∇U(x)` from `U`.
+Common helper to build a gradient function `∇U(x)` from `U` and resolve
+the effective AD backend once at initialization time.
 
 - `x` is assumed to be an `AbstractVector`
 - Always returns a **vector gradient of length `dim`**
@@ -56,66 +57,88 @@ function create_gradient_function(U::Function, dim::Int, AD_backend::String)
     if length(probe_y) != dim
       throw(ArgumentError("Expected U(x) to return a scalar potential (Real) or a gradient vector of length $dim. Got AbstractVector of length $(length(probe_y))."))
     end
-    return function(x::AbstractVector)
+    ∇U = function(x::AbstractVector)
       g = (dim == 1 && input_mode == :scalar) ? U(x[1]) : U(x)
       if dim == 1 && (g isa Real)
         return [g]
       end
       return g
     end
+    return (; gradient=∇U, AD_backend=AD_backend)
   elseif !(probe_y isa Real)
     throw(ArgumentError("Expected U(x) to return a scalar potential (Real) or a gradient vector (AbstractVector). Got $(typeof(probe_y))."))
   end
 
   # Case 2: user provided a scalar potential U(x)::Real → build ∇U(x)
-  if AD_backend == "Zygote"
+  resolved_backend = AD_backend
+  if AD_backend == "ForwardDiff"
+    resolved_backend = if dim == 1 && input_mode == :scalar
+      try
+        ForwardDiff.derivative(U, 1.0)
+        "ForwardDiff"
+      catch
+        "Zygote"
+      end
+    else
+      try
+        ForwardDiff.gradient(U, probe_x_vec)
+        "ForwardDiff"
+      catch
+        "Zygote"
+      end
+    end
+  end
+
+  if resolved_backend == "Zygote"
     if dim == 1 && input_mode == :scalar
-      return function(x::AbstractVector)
+      ∇U = function(x::AbstractVector)
         return [Zygote.gradient(U, x[1])[1]]
       end
     else
-      return function(x::AbstractVector)
+      ∇U = function(x::AbstractVector)
         return Zygote.gradient(U, x)[1]
       end
     end
-  elseif AD_backend == "ForwardDiff"
+  elseif resolved_backend == "ForwardDiff"
     if dim == 1 && input_mode == :scalar
-      return function(x::AbstractVector)
+      ∇U = function(x::AbstractVector)
         return [ForwardDiff.derivative(U, x[1])]
       end
     else
-      return function(x::AbstractVector)
+      ∇U = function(x::AbstractVector)
         return ForwardDiff.gradient(U, x)
       end
     end
-  elseif AD_backend == "ReverseDiff"
+  elseif resolved_backend == "ReverseDiff"
     if dim == 1 && input_mode == :scalar
-      return function(x::AbstractVector)
+      ∇U = function(x::AbstractVector)
         return [ReverseDiff.gradient(z -> U(z[1]), [x[1]])[1]]
       end
     else
-      return function(x::AbstractVector)
+      ∇U = function(x::AbstractVector)
         return ReverseDiff.gradient(U, x)
       end
     end
-  elseif AD_backend == "Enzyme"
+  elseif resolved_backend == "Enzyme"
     if !HAS_ENZYME
       throw(ArgumentError("Enzyme package is not available. Please install it with: ] add Enzyme"))
     end
     if dim == 1 && input_mode == :scalar
-      return function(x::AbstractVector)
+      ∇U = function(x::AbstractVector)
         grad_result = Enzyme.gradient(Enzyme.Reverse, z -> U(z[1]), Enzyme.Active([x[1]]))
         return [grad_result[1][1]]
       end
     else
-      return function(x::AbstractVector)
+      ∇U = function(x::AbstractVector)
         grad_result = Enzyme.gradient(Enzyme.Reverse, U, x)
         return grad_result[1]
       end
     end
   else
-    throw(ArgumentError("Unsupported backend: $AD_backend. Supported backends: Zygote, ForwardDiff, ReverseDiff, Enzyme"))
+    throw(ArgumentError("Unsupported backend: $resolved_backend. Supported backends: Zygote, ForwardDiff, ReverseDiff, Enzyme"))
   end
+
+  return (; gradient=∇U, AD_backend=resolved_backend)
 end
 
 function threaded_gradient(f, x::AbstractArray, chunk::ForwardDiff.Chunk{C}, check = Val{false}()) where {C}

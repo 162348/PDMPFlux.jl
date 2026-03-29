@@ -115,11 +115,12 @@ end
 using Zygote, ForwardDiff, ReverseDiff
 
 function StickyZigZagAD(dim::Int, U::Function, κ::Vector{Float64}; refresh_rate::Float64=0.0, grid_size::Int=10, tmax::Union{Float64, Int}=2.0, 
-                    vectorized_bound::Bool=true, signed_bound::Bool=true, adaptive::Bool=true, AD_backend::String="Zygote")
+                    vectorized_bound::Bool=true, signed_bound::Bool=true, adaptive::Bool=true, AD_backend::String="ForwardDiff")
 
-    ∇U = set_AD_backend(AD_backend, U, dim)
+    ad_setup = set_AD_backend(AD_backend, U, dim)
+    ∇U = ad_setup.gradient
 
     return StickyZigZag(dim, ∇U, κ, refresh_rate=refresh_rate, grid_size=grid_size, tmax=tmax,
-            vectorized_bound=vectorized_bound, signed_bound=signed_bound, adaptive=adaptive, AD_backend=AD_backend)
+            vectorized_bound=vectorized_bound, signed_bound=signed_bound, adaptive=adaptive, AD_backend=ad_setup.AD_backend)
 end
 

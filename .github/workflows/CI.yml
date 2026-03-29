@@ -48,7 +48,7 @@ jobs:
         with:
           files: lcov.info
           token: ${{ secrets.CODECOV_TOKEN }}
-          fail_ci_if_error: false
+          fail_ci_if_error: true
           
   test-extended:
     name: Extended Tests - Julia ${{ matrix.version }} - ${{ matrix.os }}
@@ -82,7 +82,7 @@ jobs:
           depwarn: 'no'
   test-coverage:
     name: Coverage Tests - Julia 1.11 - Ubuntu
-    runs-on: macos-latest
+    runs-on: ubuntu-latest
     timeout-minutes: 60
     permissions:
       actions: write
@@ -107,7 +107,27 @@ jobs:
         with:
           files: lcov.info
           token: ${{ secrets.CODECOV_TOKEN }}
-          fail_ci_if_error: false
+          fail_ci_if_error: true
+  static-checks:
+    name: Static Checks - Julia 1.11 - Ubuntu
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      actions: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: '1.11'
+      - uses: julia-actions/cache@v2
+      - name: Run Aqua static checks
+        shell: julia --project=test --color=yes {0}
+        run: |
+          using Pkg
+          Pkg.develop(PackageSpec(path=pwd()))
+          Pkg.instantiate()
+          include("test/test_aqua.jl")
   docs:
     name: Documentation
     runs-on: ubuntu-latest
