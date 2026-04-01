@@ -120,7 +120,7 @@ jobs:
       - uses: julia-actions/setup-julia@v2
         with:
           version: '1.11'
-      - uses: julia-actions/cache@v2
+      - uses: julia-actions/cache@v3
       - name: Run Aqua static checks
         shell: julia --project=test --color=yes {0}
         run: |
