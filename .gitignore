@@ -3,6 +3,7 @@
 *.jl.mem
 *.jld2
 *.png
+*.gif
 /Manifest.toml
 /docs/Manifest.toml
 /test/Manifest.toml
@@ -11,3 +12,5 @@ coverage-html/
 **/.DS_Store
 papers/
 data/
+tmp/
+scripts/
